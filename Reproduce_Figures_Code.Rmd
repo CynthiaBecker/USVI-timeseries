@@ -1001,7 +1001,6 @@ disturbance.da <- differentialTest(formula = ~ disturbance + site,
                              data = ps.benthic,
                              fdr_cutoff = 0.05)
 
-
 # What microorganisms are significantly changing between hurricane and disease disturbances? Reef and timpoint are important covariates too, so control for the effect of reef site and month year timepoint abundance and dispersion
 # Note historic is the control so plots will show hurricane and diseae relative to that timepoint
 set.seed(1)
@@ -1736,7 +1735,7 @@ ggplot(cife_noIntercept, aes(x = disturbance, y = fixedeff, color = disturbance)
   labs(x = "Disturbance", y = "Estimate with 95% CI relative to Historic", title = paste(variable))
 ```
 
-# Investigate Disturbance Shifts in environmental parameters
+# REVISION FIGs Disturbance Shifts in environmental parameters - LMM approach
 
 Goal - Use a linear mixed effects modeling approach to investigate the impact that disturbances have on environmental parameters of interest. 
 Do this all in a for loop
@@ -1860,3 +1859,379 @@ for (i in 1:length(variables)) {
 
 ```
 
+# REVISION FIGs Differential Abundance 
+
+One reviewer found the grouping into different disturbances to be an oversimplification of the data. Using a regression based approach would be much better according to this reviewer. I would like to try the regression approach. 
+One key finding of the environmental data was the significant increase in ammonium on St. John reefs over time and coincident with disturbances. Ammonium directly impacts microbial communities as multiple heterotrophic and autotrophic microorganisms can assimilate ammonium or produce ammonium. 
+I am interested in understanding which microorganisms increase or decreased within the water column of st. john reefs in response to ammonium enrichment. 
+Ideally, the results will tie back to then microorganisms that increased or decreased with disturbances on reefs. With differential abundance tests I will evaluate disturbance --> nutrient enrichment --> microbial changes. And with random forests we will see which microbial changes --> nutrient enrichment --> disturbances
+
+### Load data
+```{r}
+# Prep the phyloseq object - represents low-abundance filtered data
+sample_data(ps)$site <- factor(sample_data(ps)$site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head", "Sand patch"))
+sample_data(ps)$disturbance <- factor(sample_data(ps)$disturbance, levels = c("historic", "hurricane", "disease"))
+sample_data(ps)$yearmonth <- factor(sample_data(ps)$yearmonth, levels = c("2016-06", "2016-10", "2017-03", "2017-07", "2017-11", "2018-04", "2018-11", "2020-08", "2021-01", "2021-10", "2022-06"))
+
+# Remove Ammonium values that were outliers and weren't in the environmental analysis. Also remove NAs
+sample_data(ps)$missingnh4 <- is.na(sample_data(ps)$nh4)
+sample_data(ps)$outliernh4 <- sample_data(ps)$nh4 > 0.8
+ps.nh4.narm <- ps %>%
+  subset_samples(missingnh4 == "FALSE") %>%
+  subset_samples(outliernh4 == "FALSE")
+
+# BENTHIC DATA - You are only analyzing the benthic data for the differential abundance and random forest stuff. It was not significantly different from the surface, and I would like to use the surface waters to test the RF model. 
+ps.benthic.nh4.narm <- ps.nh4.narm %>%  # name with nh4 so you know it is for the ammonium test
+  subset_samples(site != "Sand patch") %>%
+  subset_samples(depth == "Benthic")
+
+# Try renaming all the NA taxa using the fantaxtic package Natasha sent me
+ps.benthic.nh4.narm <- name_na_taxa(ps.benthic.nh4.narm, 
+                                        na_label = "Unclassified <tax> (<rank>)")
+```
+
+
+### Benthic community
+
+```{r disturbance benthic, message=FALSE}
+# What microorganisms are significantly changing with changes in ammonium? 
+
+set.seed(1)
+nh4_narm.da <- differentialTest(formula = ~ nh4, 
+                             phi.formula = ~ nh4,
+                             formula_null = ~ 1,
+                             phi.formula_null = ~ nh4,
+                             test = "LRT", boot = FALSE,
+                             data = ps.benthic.nh4.narm,
+                             fdr_cutoff = 0.05)
+
+nh4_narm.da_fdr0.1 <- differentialTest(formula = ~ nh4, 
+                             phi.formula = ~ nh4,
+                             formula_null = ~ 1,
+                             phi.formula_null = ~ nh4,
+                             test = "LRT", boot = FALSE,
+                             data = ps.benthic.nh4.narm,
+                             fdr_cutoff = 0.10)
+
+# This didn't make much of a difference
+
+# save the nh4_narm.da output and add asv, p.adj values to it, and ultimately taxonomny info
+nh4.da.models <- lapply(nh4_narm.da$significant_models, extractmods2)
+names(nh4.da.models) <- nh4_narm.da$significant_taxa
+
+# Add ASVs to the taxonomy table and save the significant asvs
+tax_table(ps.benthic.nh4.narm)[,7] <- rownames(tax_table(ps.benthic.nh4.narm))
+sig.taxonomy.nh4 <- as.data.frame(tax_table(ps.benthic.nh4.narm)[nh4_narm.da$significant_taxa,]) 
+
+# Move the data from a list to a dataframe and add taxonomy info
+nh4.da.models.df <- ldply(nh4.da.models, data.frame) %>% 
+  left_join(sig.taxonomy.nh4, by = c(".id" = "Species")) %>%
+  mutate(genusasv = paste0(Genus, "_(", .id,")"))
+
+### Save these data so you don't have to re-run the model ###
+#write.table(nh4.da.models.df, "data/Sig_ASVs_NH4_Oct23.txt", sep="\t",row.names = FALSE)
+```
+So I saved the output of all the ASVs that were differentially enriched or depleted with ammonium. 
+
+### What are the taxonomic assignments of differentially abundant taxa? Look and plot them
+
+```{r Corncob_results, message=FALSE, warning=FALSE}
+DAnh4 <- read_delim("data/Sig_ASVs_NH4_Oct23.txt", delim = "\t", col_names = TRUE)
+
+DAnh4_desc <- DAnh4 %>% 
+  arrange(desc(Class), Estimate)
+
+kable(DAnh4_desc)
+
+# plot the differential abundance results
+
+genusASVorder <- DAnh4_desc %>%
+  arrange(desc(Class), Estimate) %>%
+  dplyr::select(genusasv) %>%
+  unique() 
+
+DAnh4_desc$genusasv <- factor(DAnh4_desc$genusasv, levels = as.vector(genusASVorder$genusasv))
+DAnh4_desc$Class <- factor(DAnh4_desc$Class, levels = c("Acidimicrobiia", 
+                                                        "Alphaproteobacteria", 
+                                                "Bacteroidia",
+                                                "Cyanobacteriia",
+                                                "Gammaproteobacteria", 
+                                                "Unclassified SAR324 clade(Marine group B) (Phylum)", 
+                                                "Verrucomicrobiae"))
+
+palcolors <- c("#CC7A88", "#99600F", "#CCAA7A", "#54990F", "#3D0F99", "#967ACC","#0F8299",  "#7ABECC", "#333333", "#999999")
+
+ggplot(DAnh4_desc, aes(x = genusasv, y = Estimate, color = Class)) +
+  geom_errorbar(aes(ymin = Estimate-Std.Error, ymax = Estimate+Std.Error), color = "black", width = .3, position=position_dodge(.9)) +
+  geom_point(size = 4) +
+  coord_flip() +
+  theme_bw() +
+  labs(x = "Taxa", y = "Differential Abundance") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "darkgray") +
+  theme(plot.background = element_blank(), 
+        legend.position = "bottom") +
+  scale_color_manual(values = palcolors)
+```
+
+# Random Forest Analysis
+```{r}
+# Use the same phyloseq object where I removed the samples with NAs for the ammonium values
+
+# BENTHIC FILTERED data (~1000 taxa)
+ps.benthic.nh4.narm.filt <- ps.benthic.nh4.narm %>% 
+  filter_taxa(function(x) mean(x) > 0.5, TRUE) # keep if avg abundance 0.5 counts
+
+taxa <- ps.benthic.nh4.narm.filt %>% tax_table() %>% rownames
+
+# Get surface taxa based on the asvs in the benthic seawater - This will be for validation of the random forest model
+
+ps.surface.nh4.narm.filt <- ps.nh4.narm %>% 
+  subset_samples(site != "Sand patch") %>%
+  subset_samples(depth == "Surface") %>%
+  mutate_tax_table(ASV = .otu) %>% 
+  subset_taxa(ASV %in% taxa)
+```
+
+## Generate and test random forest model
+```{r RF model}
+## RANDOM FOREST ANALYSIS ##
+# get the ASVs as columns and samples as rows, which are the predictors
+predictors <- t(otu_table(ps.benthic.nh4.narm.filt))
+
+# response variable is ammonium
+response <- sample_data(ps.benthic.nh4.narm.filt)$nh4
+
+# combine with the ASV table
+resp.pred <- data.frame(response, predictors)
+
+# set seed for reproducibility and this is the main random forest model
+set.seed(10)
+nh4.RF <- randomForest(response ~ ., data = resp.pred, ntree = 1000, importance = TRUE)
+
+print(nh4.RF)
+
+# Explains 66% of variance?!?!?!?!?!? That is way higher than anything I tried before
+
+
+# Look at the predicted ammonium compared to actual ammonium in BENTHIC data
+predicted.actual.benthic <- data.frame("predicted" = nh4.RF$predicted, "actual" = resp.pred$response)
+
+ggplot(predicted.actual.benthic, aes(x = actual, y = predicted)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  labs(x = "Actual ammonium", y = "Predicted ammonium", 
+       title = "Prediction of ammonium from Random Forest model on benthic data")
+
+# Validate the model on surface data
+validation.pred <- t(otu_table(ps.surface.nh4.narm.filt))
+
+validation.resp <- sample_data(ps.surface.nh4.narm.filt)$nh4
+
+valid.pred.resp <- data.frame(validation.resp, validation.pred)
+
+prediction_surface <- predict(nh4.RF, valid.pred.resp[,-1])
+
+predicted.actual.surface <- data.frame("predicted" = prediction_surface, 
+                                       "actual" = sample_data(ps.surface.nh4.narm.filt)$nh4)
+
+ggplot(predicted.actual.surface, aes(x = actual, y = predicted)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = FALSE) +
+  labs(x = "Actual ammonium", y = "Predicted ammonium", 
+       title = "Prediction of ammonium in surface water", 
+       subtitle = "Prediction using Random Forest model trained on benthic ammonium data")
+
+# I need to calculate the mean squared error between the actual and predicted values using the model on the test set (surface seawater data)
+mse_predict <- mean((prediction_surface-validation.resp)^2) #on the trained surface data
+mse_predict
+
+mse_model <- mean((nh4.RF$predicted-resp.pred$response)^2) #on the benthic data - direct from the model
+mse_model
+# THIS IS PRETTY LOW COMPARED TO THE ONLINE TUTORIALS I AM FINDING
+```
+
+## Save Random Forest data output
+```{r}
+# make a data frame with predictor names and the importance value
+imp <- importance(nh4.RF)
+imp <- data.frame(predictors = rownames(imp), imp)
+
+# order the predictor levels by importance (higher number is more important)
+imp.sort.Accuracy <- arrange(imp, desc(X.IncMSE))
+
+# Select the top 50 important taxa based on the Mean Decrease Accurracy metric
+imp.50.acc <- imp.sort.Accuracy[1:50,]
+
+# Save a table of the top 50 ASVs
+ASV.50.acc <- imp.50.acc$predictors
+r <- rownames(tax_table(ps.benthic.nh4.narm.filt)) %in% ASV.50.acc
+table <- tax_table(ps.benthic.nh4.narm.filt)[r,]
+
+table <- as.data.frame(table)
+table$ASV <- rownames(table)
+
+tableAccuracy <- left_join(table, imp.50.acc, by = c("ASV" = "predictors"))
+
+#write.table(tableAccuracy, "data/RandomForest_NH4_top50_accuracy_benthic.txt", sep = "\t", row.names = FALSE)
+
+kable(table)
+
+# Graph the top 50 taxa
+tableAccuracy.genusasv <- tableAccuracy %>%
+  mutate(genusasv = paste0(Genus, "_(", ASV,")"))
+
+genusASVorder <- tableAccuracy.genusasv %>%
+  arrange(desc(Class), X.IncMSE) %>%
+  dplyr::select(genusasv) %>%
+  unique() 
+
+tableAccuracy.genusasv$genusasv <- factor(tableAccuracy.genusasv$genusasv, levels = as.vector(genusASVorder$genusasv))
+tableAccuracy.genusasv$Class <- factor(tableAccuracy.genusasv$Class, levels = c("Alphaproteobacteria",
+                                                                                "Bacteroidia",
+                                                                                "Bdellovibrionia",
+                                                                                "Cyanobacteriia",
+                                                                                "Dadabacteriia",
+                                                                                "Gammaproteobacteria",
+                                                                                "Unclassified Marinimicrobia (SAR406 clade) (Phylum)",
+                                                                                "Unclassified SAR324 clade(Marine group B) (Phylum)",
+                                                                                "Thermoplasmata",
+                                                                                "Verrucomicrobiae"))
+
+
+# Graph all 50 taxa and their percent increase in MSE
+ggplot(tableAccuracy.genusasv, aes(x = genusasv, y = X.IncMSE, fill = Class)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_fill_manual(values = palcolors) +
+  theme(plot.background = element_blank()) +
+  labs(x = "Taxa", y = "% Increase MSE") +
+  theme(legend.position = "bottom")
+
+ggsave("figures/RF_Important_ASVs_NH4.pdf", height = 9)
+```
+
+Ultimately we want to have as small a mean squared error as possible in the model. The most important ASVs are those that reduce the variance in the model. In other words, when the ASV is removed, it leads to the highest INCREASE in MSE (mean square error) in the regression-based model. More error is generally bad. This is the metric that the random forest algorithm uses to identify an "IMPORTANT" ASV. I just chose arbitrarily to select the top 50 ASVs that are important based on their % increase in mean square error of the model when they are removed. 
+
+# REVISED DA and RF figure
+```{r message=FALSE}
+DAtaxa <- read_delim("data/Sig_ASVs_NH4_Oct23.txt", delim = "\t", col_names = TRUE)
+
+RFtaxa <- read_delim("data/RandomForest_NH4_top50_accuracy_benthic.txt", delim = "\t", col_names = TRUE)
+
+RFasvs <- RFtaxa %>% 
+  dplyr::select(ASV, X.IncMSE)
+
+shared <- DAtaxa %>%
+  left_join(RFasvs, by = c(".id" = "ASV")) %>%
+  drop_na(X.IncMSE) # remove NAs, which indicates the microbe was NOT a predictor in the random forest analysis
+
+# how many ASVs?
+shared$.id %>% unique %>% length
+```
+
+Make a table of shared taxa
+```{r}
+importantASVs <- shared$.id %>% unique
+
+r <- rownames(tax_table(ps.benthic.nh4.narm.filt)) %in% importantASVs
+
+sharedtaxa <- as.data.frame(tax_table(ps.benthic.nh4.narm.filt)[r,])
+```
+
+Make the shared graph
+```{r}
+# corncob results
+# order the taxa how i want them in the plot, with the archaea at the bottom
+genusASVorder <- shared %>%
+  arrange(desc(Class), Estimate) %>%
+  dplyr::select(genusasv) %>%
+  unique() 
+
+shared$genusasv <- factor(shared$genusasv, levels = as.vector(genusASVorder$genusasv))
+shared$Class <- factor(shared$Class, levels = c("Alphaproteobacteria", 
+                                                "Bacteroidia",
+                                                "Cyanobacteriia",
+                                                "Gammaproteobacteria", 
+                                                "Unclassified SAR324 clade(Marine group B) (Phylum)"))
+
+
+palcolors <- c("#CC7A88", "#99600F", "#CCAA7A", "#54990F", "#3D0F99", "#967ACC","#0F8299",  "#7ABECC", "#333333", "#999999")
+
+a <- ggplot(shared, aes(x = genusasv, y = Estimate, color = Class)) +
+  geom_errorbar(aes(ymin = Estimate-Std.Error, ymax = Estimate+Std.Error), color = "black", width = .3, position=position_dodge(.9)) +
+  geom_point(size = 4) +
+  coord_flip() +
+  theme_bw() +
+  labs(x = "Taxa", y = "Differential Abundance") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "darkgray") +
+  theme(plot.background = element_blank(), 
+        legend.position = "bottom") +
+  scale_color_manual(values = palcolors)
+
+b <- ggplot(shared, aes(x = genusasv, y = X.IncMSE, fill = Class)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_fill_manual(values = palcolors) +
+  theme(plot.background = element_blank()) +
+  labs(x = "Taxa", y = "% Increase MSE") +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = "none")
+
+a
+b
+
+wrap_plots(a, b, widths = c(1,1))
+
+#ggsave("figures/DA_RF_shared_NH4_10.26.23.pdf", width = 9, height = 4.5)
+```
+
+Relative abundance of shared sensitive (differentially abundant) and predictive (random forests) taxa in relation to ammonium
+```{r}
+# Shared is from the section on "How many ASVs were shared?"
+# prep the data
+ASVshared <- shared %>%
+  dplyr::select(.id) %>%
+  unique()
+
+ASVshared <- ASVshared$.id # must be a vector
+
+# Take data from only benthic samples, since the main models were tested on benthic data. Could also show benthic AND surface if you want.
+ps.shared.ra <- ps.benthic.nh4.narm %>%
+  transform_sample_counts(function(x) x / sum(x)) %>%
+  mutate_tax_table(ASV = .otu) %>%
+  subset_taxa(ASV %in% ASVshared) 
+
+ASVorder <- shared %>%
+  arrange(Kingdom, desc(Class), Estimate) %>%
+  dplyr::select(.id) %>%
+  unique()
+
+# plot relative abundance data
+shared.ra.long <- ps.shared.ra %>%
+  otu_table() %>%
+  as_tibble() %>%
+  left_join(as_tibble(tax_table(ps.shared.ra)), by = ".otu") %>%
+  left_join(as_tibble(sample_data(ps.shared.ra)), by = ".sample") %>%
+  mutate(genusasv = paste0(Genus, "_(", .otu, ")")) %>%
+  mutate(.otu = factor(.otu, levels = as.vector(ASVorder$.id))) %>%
+  mutate(genusasv = factor(genusasv, levels = as.vector(genusASVorder$genusasv))) %>% 
+  mutate(Class = factor(Class, levels = c("Alphaproteobacteria", 
+                                                "Bacteroidia",
+                                                "Cyanobacteriia",
+                                                "Gammaproteobacteria", 
+                                                "Unclassified SAR324 clade(Marine group B) (Phylum)")))
+
+ggplot(shared.ra.long, aes(x = nh4, y = .abundance)) +
+  geom_point(aes(color = disturbance), size = 2, alpha = 0.7) +
+  geom_smooth(method = 'lm', se = FALSE, color = "black") +
+  facet_wrap(~ Class + genusasv, ncol = 5, scales = "free_y") +
+  labs(y = "Relative abundance", x = "Ammonium (uM)", color = "Disturbance") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank(),
+        legend.position = "bottom")
+
+#ggsave("figures/DA_RF_shared_NH4_regression.pdf", width = 12, height = 6)
+```
