@@ -98,7 +98,36 @@ TAX = tax_table(taxa)
 META = sample_data(samples)
 
 ps <- phyloseq(ASV, TAX, META)
+ps
 ```
+
+Note that using filtered data for alpha diveristy can lead to incorrect estimations. Especially since I am interested in estimating richness. To circumvent this, I will use the full dataset ~33k ASVs that have not been filtered to remove low-abundance ASVs. The "filt" extension in this case only refers to the fact that these tables have been filtered of DNA extraction contaminatns (via decontam) and filtered of a few samples that had abnormally low sequencing depth. 
+```{r Microbiome data for alpha diversity}
+asv.a <- read.table("data/ASV_filt.txt",sep="\t",header=TRUE, row.names=1)
+taxa.a <- as.matrix(read.table("data/taxonomy_filt.txt", sep="\t", header=TRUE, row.names=1))
+samples.a <- read.table("data/metadata_filt.txt",sep="\t",header=T,row.names=1)
+
+colnames(asv.a) <- str_replace_all(colnames(asv.a), pattern = "[X]", "")
+
+# add seasonality information ("wetdryseason" specifically) to the metadata_filt
+samples.prev <- samples %>% 
+  mutate(sampleID = rownames(.))
+
+seasoninfo <- samples.a %>% 
+  mutate(sampleID = rownames(.)) %>% 
+  dplyr::select(sampleID) %>% 
+  left_join(samples.prev, by = "sampleID")
+
+rownames(seasoninfo) <- seasoninfo$sampleID
+
+ASV.a = otu_table(asv.a, taxa_are_rows = TRUE)
+TAX.a = tax_table(taxa.a)
+META.a = sample_data(seasoninfo)
+
+ps.a <- phyloseq(ASV.a, TAX.a, META.a)
+ps.a
+```
+
 
 # WHAT ABOUT USING THE NON FILTERED DATA FOR THE ALPHA DIVERSITY ANALYSES???????
 
@@ -545,6 +574,8 @@ ggarrange(phase, ratio, ncol = 2, labels = c("a.",  "b."), common.legend = TRUE)
   ggtitle("Supplementary Figure S3")
 ```
 By what percent did hard coral decrease from the hurricane period to the end of the study in the disease period? Average (within reefs) hurricane values and disease values and get a percent per reef before and after.
+
+Also get coral cover at the start and end of the study
 ```{r}
 hardcoral <- benthic.forFigures %>%
   filter(datatype == "HardCoral") %>%
@@ -556,6 +587,13 @@ hardcoral <- benthic.forFigures %>%
   mutate(percent_decrease = (coral_change / hurricane)* 100)
 
 kable(hardcoral)
+
+# How much coral cover was there at the first and last time period?
+coralstart_end <- benthic.forFigures %>% 
+  tidyr::spread(key = datatype, value = value) %>%
+  mutate(totalcoral = (HardCoral + SoftCoral)*100) %>%
+  dplyr::select(site, yearmonth, totalcoral) %>%
+  filter(yearmonth %in% c("2016-06", "2022-06"))
 ```
 
 By what percent did turf algae and Ramicrusta increase from the beginning to the end of the study in the disease period? Average (within reefs) historic or hurricne (for ramicrusta) values and disease values and get a percent per reef before and after.
@@ -588,6 +626,13 @@ kable(ramicrusta)
 
 mean(ramicrusta$percent_increase)
 sd(ramicrusta$percent_increase)
+
+# How much algal cover was there at the first and last time period?
+algaestart_end <- benthic.forFigures %>% 
+  tidyr::spread(key = datatype, value = value) %>%
+  mutate(totalalgae = (Ramicrusta + Macroalgae + TurfAlgae)*100) %>%
+  dplyr::select(site, yearmonth, totalalgae) %>%
+  filter(yearmonth %in% c("2016-06", "2022-06"))
 ```
 
 
@@ -1532,7 +1577,7 @@ ggplot(cells.forFigures, aes(x = Date, y = value, color = site)) +
   labs(y = "Abundance (cells per milliliter)", shape = "Depth", color = "Reef", title = "Supplementary Figure S19") 
 ```
 
-# Figures and Analyses for paper revision
+# REVISIONS Figures and Analyses for paper revision
 
 ## Try accounting for sampling site and sampling timepoint in the disturbance analysis for environmental data. 
 ### First Hard Coral to test
@@ -1780,9 +1825,9 @@ CI_list <- list()
 for (i in 1:length(variables)) {
   cat("Variable:", variables[i], "\n")
   
-  envdata <- filter(env.data.foranalysis, datatype == variables[i])
+  vardata <- filter(env.data.foranalysis, datatype == variables[i])
   
-  model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = envdata)
+  model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = vardata)
   
   cat("Summary of Model for", variables[i], "\n")
   print(summary(model))
@@ -1790,7 +1835,7 @@ for (i in 1:length(variables)) {
   # save the predicted and raw values
   pred <- predict(model)
   res <- residuals(model)
-  res.pred.data <- data.frame(pred, res, envdata)
+  res.pred.data <- data.frame(pred, res, vardata)
   
   var <- variables[i]
   
@@ -1831,9 +1876,9 @@ for (i in 1:length(variables)) {
   ggsave(paste("figures/lmer_figs/", var, "_assumptions_yearmonth.pdf", sep = ""), plot = p3)
   
   # Make models with and without the random effects and a null model without disturbance as fixed effect
-  notime_model <- lmerTest::lmer(value ~ disturbance + (1|site), data = envdata)
-  nosite_model <- lmerTest::lmer(value ~ disturbance + (1|yearmonth), data = envdata)
-  null_model <- lmerTest::lmer(value ~ 1 + (1|site) + (1|yearmonth), data = envdata)
+  notime_model <- lmerTest::lmer(value ~ disturbance + (1|site), data = vardata)
+  nosite_model <- lmerTest::lmer(value ~ disturbance + (1|yearmonth), data = vardata)
+  null_model <- lmerTest::lmer(value ~ 1 + (1|site) + (1|yearmonth), data = vardata)
   
   # run a likelihood ratio test to evaluate if additional random/fixed effects leads to a better fit of the model
   time_LRT <- anova(model, notime_model)
@@ -1903,16 +1948,16 @@ I need to do this due diligence so that I can be confident in the statistical ap
 # Re-run and check the outliers and results after removing the outliers. 
 env.data.foranalysis
 
-envdata <- filter(env.data.foranalysis, datatype == "po4_um")
+vardata <- filter(env.data.foranalysis, datatype == "po4_um")
   
-model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = envdata)
+model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = vardata)
 
 summary(model)
   
 # save the predicted and raw values
 pred <- predict(model)
 res <- residuals(model)
-res.pred.data <- data.frame(pred, res, envdata)
+res.pred.data <- data.frame(pred, res, vardata)
   
 var <- "po4_um"
   
@@ -2142,16 +2187,16 @@ When comparing the results of the prochlorococcus model before and after removin
 # Re-run and check the outliers and results after removing the outliers. 
 env.data.foranalysis
 
-envdata <- filter(env.data.foranalysis, datatype == "peuk_per_ml")
+vardata <- filter(env.data.foranalysis, datatype == "peuk_per_ml")
   
-model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = envdata)
+model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = vardata)
 
 summary(model)
   
 # save the predicted and raw values
 pred <- predict(model)
 res <- residuals(model)
-res.pred.data <- data.frame(pred, res, envdata)
+res.pred.data <- data.frame(pred, res, vardata)
   
 var <- "peuk_per_ml"
   
@@ -2247,16 +2292,16 @@ When comparing the results of the picoeukaryote model before and after removing 
 # Re-run and check the outliers and results after removing the outliers. 
 env.data.foranalysis
 
-envdata <- filter(env.data.foranalysis, datatype == "Ramicrusta")
+vardata <- filter(env.data.foranalysis, datatype == "Ramicrusta")
   
-model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = envdata)
+model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = vardata)
 
 summary(model)
   
 # save the predicted and raw values
 pred <- predict(model)
 res <- residuals(model)
-res.pred.data <- data.frame(pred, res, envdata)
+res.pred.data <- data.frame(pred, res, vardata)
   
 var <- "Ramicrusta"
   
@@ -2803,6 +2848,30 @@ ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Fig
 c
 ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_nut_microbe_changes_notsig.pdf", width = 8, height = 7)
 ```
+## What about prochloroccocus versus ammonium concentration to go along with the sequence data results?
+
+```{r pro vs nh4}
+pronh4 <- envdata %>%
+  filter(site != "USVI Blue Water") %>%
+  dplyr::select(Date, site, siteacronym, yearmonth, disturbance, pro_per_ml, nh4_um) %>%
+  mutate(site = factor(site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head", "Sand patch"))) %>%
+  filter(site != "Sand patch") %>% #no need to calculate sand patch stuff
+  mutate(disturbance = factor(disturbance, levels = c("historic", "hurricane", "disease"))) %>%
+  filter(nh4_um < 0.8) # remove outlier/high ammonium values removed from environmental data analysis 
+
+ggplot(pronh4, aes(x = nh4_um, y = pro_per_ml)) +
+  geom_point(aes(color = disturbance), size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  ylim(0,150000) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Ammonium (uM)", y = "Prochlorococcus abundance (cells ml-1)", color = "Disturbance")
+
+lm <- lm(pro_per_ml ~ nh4_um, data = pronh4)
+summary(lm)
+
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_pro_vs_nh4.pdf", width = 5, height = 3)
+```
+
 
 # REVISION FIG 3 Code
 
@@ -2948,13 +3017,13 @@ nh4_narm.da <- differentialTest(formula = ~ nh4,
                              data = ps.benthic.nh4.narm,
                              fdr_cutoff = 0.05)
 
-nh4_narm.da_fdr0.1 <- differentialTest(formula = ~ nh4, 
-                             phi.formula = ~ nh4,
-                             formula_null = ~ 1,
-                             phi.formula_null = ~ nh4,
-                             test = "LRT", boot = FALSE,
-                             data = ps.benthic.nh4.narm,
-                             fdr_cutoff = 0.10)
+# nh4_narm.da_fdr0.1 <- differentialTest(formula = ~ nh4, 
+#                             phi.formula = ~ nh4,
+#                             formula_null = ~ 1,
+#                             phi.formula_null = ~ nh4,
+#                             test = "LRT", boot = FALSE,
+#                             data = ps.benthic.nh4.narm,
+#                             fdr_cutoff = 0.10)
 
 # This didn't make much of a difference
 
@@ -2972,7 +3041,7 @@ nh4.da.models.df <- ldply(nh4.da.models, data.frame) %>%
   mutate(genusasv = paste0(Genus, "_(", .id,")"))
 
 ### Save these data so you don't have to re-run the model ###
-#write.table(nh4.da.models.df, "data/Sig_ASVs_NH4_Oct23.txt", sep="\t",row.names = FALSE)
+write.table(nh4.da.models.df, "data/Sig_ASVs_NH4_Oct23.txt", sep="\t",row.names = FALSE)
 ```
 So I saved the output of all the ASVs that were differentially enriched or depleted with ammonium. 
 
@@ -3002,7 +3071,7 @@ DAnh4_desc$Class <- factor(DAnh4_desc$Class, levels = c("Acidimicrobiia",
                                                 "Unclassified SAR324 clade(Marine group B) (Phylum)", 
                                                 "Verrucomicrobiae"))
 
-palcolors <- c("#CC7A88", "#99600F", "#CCAA7A", "#54990F", "#3D0F99", "#967ACC","#0F8299",  "#7ABECC", "#333333", "#999999")
+palcolors <- c("#990F26", "#CC7A88", "#99600F", "#54990F", "#967ACC", "#7ABECC", "#999999")
 
 ggplot(DAnh4_desc, aes(x = genusasv, y = Estimate, color = Class)) +
   geom_errorbar(aes(ymin = Estimate-Std.Error, ymax = Estimate+Std.Error), color = "black", width = .3, position=position_dodge(.9)) +
@@ -3014,6 +3083,8 @@ ggplot(DAnh4_desc, aes(x = genusasv, y = Estimate, color = Class)) +
   theme(plot.background = element_blank(), 
         legend.position = "bottom") +
   scale_color_manual(values = palcolors)
+
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_Corncob_all_NH4.pdf", height = 5, width = 8)
 ```
 
 # Random Forest Analysis
@@ -3057,11 +3128,20 @@ print(nh4.RF)
 
 
 # Look at the predicted ammonium compared to actual ammonium in BENTHIC data
-predicted.actual.benthic <- data.frame("predicted" = nh4.RF$predicted, "actual" = resp.pred$response)
+predicted.actual.benthic <- data.frame("predicted" = nh4.RF$predicted, 
+                                       "actual" = resp.pred$response,
+                                       sample_data(ps.benthic.nh4.narm.filt))
 
 ggplot(predicted.actual.benthic, aes(x = actual, y = predicted)) +
   geom_point() +
   geom_smooth(method = 'lm', se = FALSE) +
+  labs(x = "Actual ammonium", y = "Predicted ammonium", 
+       title = "Prediction of ammonium from Random Forest model on benthic data")
+
+benthRFplot <- ggplot(predicted.actual.benthic, aes(x = actual, y = predicted)) +
+  geom_point(aes(color = disturbance), size = 3, alpha = 0.8) +
+  geom_smooth(method = 'lm', se = FALSE, color = "black") +
+  scale_color_brewer(palette = "Dark2") +
   labs(x = "Actual ammonium", y = "Predicted ammonium", 
        title = "Prediction of ammonium from Random Forest model on benthic data")
 
@@ -3075,7 +3155,8 @@ valid.pred.resp <- data.frame(validation.resp, validation.pred)
 prediction_surface <- predict(nh4.RF, valid.pred.resp[,-1])
 
 predicted.actual.surface <- data.frame("predicted" = prediction_surface, 
-                                       "actual" = sample_data(ps.surface.nh4.narm.filt)$nh4)
+                                       "actual" = sample_data(ps.surface.nh4.narm.filt)$nh4,
+                                       sample_data(ps.surface.nh4.narm.filt))
 
 ggplot(predicted.actual.surface, aes(x = actual, y = predicted)) +
   geom_point() +
@@ -3084,13 +3165,23 @@ ggplot(predicted.actual.surface, aes(x = actual, y = predicted)) +
        title = "Prediction of ammonium in surface water", 
        subtitle = "Prediction using Random Forest model trained on benthic ammonium data")
 
+surfRFplot <- ggplot(predicted.actual.surface, aes(x = actual, y = predicted)) +
+  geom_point(aes(color = disturbance), size = 3, alpha = 0.8) +
+  geom_smooth(method = 'lm', se = FALSE, color = "black") +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Actual ammonium", y = "Predicted ammonium", 
+       title = "Prediction of ammonium in surface water, model trained on benthic data")
+
 # I need to calculate the mean squared error between the actual and predicted values using the model on the test set (surface seawater data)
-mse_predict <- mean((prediction_surface-validation.resp)^2) #on the trained surface data
+mse_predict <- mean((prediction_surface-validation.resp)^2) #on the surface data using model trained on benthic data
 mse_predict
 
-mse_model <- mean((nh4.RF$predicted-resp.pred$response)^2) #on the benthic data - direct from the model
+mse_model <- mean((nh4.RF$predicted-resp.pred$response)^2) #on the benthic data - direct from the model with data used to train model
 mse_model
 # THIS IS PRETTY LOW COMPARED TO THE ONLINE TUTORIALS I AM FINDING
+
+benthRFplot
+surfRFplot
 ```
 
 ## Save Random Forest data output
@@ -3141,16 +3232,29 @@ tableAccuracy.genusasv$Class <- factor(tableAccuracy.genusasv$Class, levels = c(
                                                                                 "Verrucomicrobiae"))
 
 
+palcolorsRF <- c("#CC7A88", "#99600F", "#CCAA7A", "#54990F", "#3D0F99", "#967ACC", "#3E9FB3", "#7ABECC", "#333333", "#999999")
+
+
 # Graph all 50 taxa and their percent increase in MSE
-ggplot(tableAccuracy.genusasv, aes(x = genusasv, y = X.IncMSE, fill = Class)) +
+top50 <- ggplot(tableAccuracy.genusasv, aes(x = genusasv, y = X.IncMSE, fill = Class)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  scale_fill_manual(values = palcolors) +
+  scale_fill_manual(values = palcolorsRF) +
   theme(plot.background = element_blank()) +
   labs(x = "Taxa", y = "% Increase MSE") +
   theme(legend.position = "bottom")
+top50
 
-ggsave("figures/RF_Important_ASVs_NH4.pdf", height = 9)
+#ggsave("figures/RF_Important_ASVs_NH4.pdf", height = 9)
+
+
+# Combine the top 50 plot with the regression model plots
+supp <- ggarrange(ggarrange(benthRFplot, surfRFplot, 
+          ncol = 1, nrow = 2, labels = c("a.", "b.")), 
+          top50, widths = c(2,3), labels = c("a.", "c."))
+supp
+
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_RandomForest_MSE_top50.pdf", height = 8, width = 12)
 ```
 
 Ultimately we want to have as small a mean squared error as possible in the model. The most important ASVs are those that reduce the variance in the model. In other words, when the ASV is removed, it leads to the highest INCREASE in MSE (mean square error) in the regression-based model. More error is generally bad. This is the metric that the random forest algorithm uses to identify an "IMPORTANT" ASV. I just chose arbitrarily to select the top 50 ASVs that are important based on their % increase in mean square error of the model when they are removed. 
@@ -3198,7 +3302,7 @@ shared$Class <- factor(shared$Class, levels = c("Alphaproteobacteria",
                                                 "Unclassified SAR324 clade(Marine group B) (Phylum)"))
 
 
-palcolors <- c("#CC7A88", "#99600F", "#CCAA7A", "#54990F", "#3D0F99", "#967ACC","#0F8299",  "#7ABECC", "#333333", "#999999")
+palcolor3 <- c("#CC7A88", "#99600F", "#54990F", "#967ACC","#7ABECC")
 
 a <- ggplot(shared, aes(x = genusasv, y = Estimate, color = Class)) +
   geom_errorbar(aes(ymin = Estimate-Std.Error, ymax = Estimate+Std.Error), color = "black", width = .3, position=position_dodge(.9)) +
@@ -3209,12 +3313,12 @@ a <- ggplot(shared, aes(x = genusasv, y = Estimate, color = Class)) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "darkgray") +
   theme(plot.background = element_blank(), 
         legend.position = "bottom") +
-  scale_color_manual(values = palcolors)
+  scale_color_manual(values = palcolor3)
 
 b <- ggplot(shared, aes(x = genusasv, y = X.IncMSE, fill = Class)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  scale_fill_manual(values = palcolors) +
+  scale_fill_manual(values = palcolor3) +
   theme(plot.background = element_blank()) +
   labs(x = "Taxa", y = "% Increase MSE") +
   theme(axis.title.y = element_blank(),
@@ -3227,7 +3331,7 @@ b
 
 wrap_plots(a, b, widths = c(1,1))
 
-#ggsave("figures/DA_RF_shared_NH4_10.26.23.pdf", width = 9, height = 4.5)
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/Fig5_DA_RF_shared_NH4_10.26.23.pdf", width = 9, height = 3.5)
 ```
 
 Relative abundance of shared sensitive (differentially abundant) and predictive (random forests) taxa in relation to ammonium
@@ -3276,5 +3380,404 @@ ggplot(shared.ra.long, aes(x = nh4, y = .abundance)) +
         panel.background = element_blank(),
         legend.position = "bottom")
 
-#ggsave("figures/DA_RF_shared_NH4_regression.pdf", width = 12, height = 6)
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/Fig6_DA_RF_relabund_regression.pdf", width = 12, height = 6)
+```
+
+
+# REVISED alpha diversity
+
+# Alpha and beta diversity analyses
+
+## Alpha diversity
+
+Make sure to use the `ps.a` physloseq object since that one has all the low abundaance ASVs RETAINED. This is important since I am trying to estimate the true richness, so I cant filter out half of the data set. 
+
+### Does depth influence alpha diversity?
+```{r publication figures Alpha diversity}
+#set levels
+sample_data(ps.a)$date <- as.Date(sample_data(ps.a)$date, tryFormats = c("%m/%d/%y"))
+sample_data(ps.a)$site <- factor(sample_data(ps.a)$site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head", "Sand patch"))
+sample_data(ps.a)$disturbance <- factor(sample_data(ps.a)$disturbance, levels = c("historic", "hurricane", "disease"))
+sample_data(ps.a)$depthtype <- factor(sample_data(ps.a)$depthtype, levels = c("benthic", "surface"))
+
+### Does Alpha diversity change with depth?? ###
+# estimate richness
+richness <- ps.a %>% breakaway        # estimate true richness
+
+# Do inference on richness - I hypothesize that richness changes with depth
+meta_richness <- ps.a %>%
+  sample_data %>%
+  as_tibble %>%
+  mutate("sample_names" = ps.a %>% sample_names) %>%
+  left_join(summary(richness),
+            by = "sample_names") 
+
+# Test the effect of depth on estimated richness
+bt_depth_fixed <- betta(formula = estimate ~ depthtype, 
+                      ses = error, data = meta_richness)
+bt_depth_fixed$table
+bt_depth_fixed$global[2]
+
+alphadepth <- ggplot(meta_richness, aes(x = depthtype, y = estimate)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = depthtype, shape = disturbance), size = 3, alpha = 0.7) +
+  labs(y = "Breakaway estimate of richness", x = "Disturbance", color = "Depth", shape = "Disturbance", 
+       title = "Benthic microbial richness changes with disturbance") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+alphadepth
+```
+Based on this, alpha diversity significantly changes with depth, therefore, I will split up the alpha diversity analyses. THIS IS VERY SIMILAR TO THE PREVIOUS GRAPH! BUT BEFORE I MADE AN ERROR AND IDDN'T USE THE UNFILTERED DATA
+
+### Benthic - Does disturbance, reef, and sampling timepoint influence alpha diversity? Also test for season.
+```{r alpha diversity benthic}
+## BENTHIC ANALYSIS FIRST #####
+ps.a_benthic <- ps.a %>%
+  subset_samples(site != "Sand patch") %>%  # get rid of sandpatch
+  subset_samples(depth == "Benthic")        # only interested in benthic data
+
+benthic_richness <- ps.a_benthic %>% breakaway        # estimate true richness
+
+# Do inference on richness - I hypothesize that richness changes by reef and disturbance
+benthic_meta_richness <- ps.a_benthic %>%
+  sample_data %>%
+  as_tibble %>%
+  mutate("sample_names" = ps.a_benthic %>% sample_names) %>%
+  left_join(summary(benthic_richness),
+            by = "sample_names")
+
+# I hypothesize that reef (site) will have a significant impact on alpha diversity - IT DOES
+set.seed(100)
+bt_site_fixed <- betta(formula = estimate ~ site, 
+                      ses = error, data = benthic_meta_richness)
+bt_site_fixed$table
+bt_site_fixed$global[2] # get global p-value to see if there are changes across all reefs
+
+# I hypothesize that sampling timepoint (yearmonth, coded as year and month of sampling event) will significanlty influence alpha diversity because of seasonal fluctuations in temperature and rainfall and local conditions and other environmental features that may not be accounted for in the sampling regime. 
+# Overall significant but not different between events. 
+bt_yearmonth_fixed <- betta(formula = estimate ~ yearmonth, 
+                      ses = error, data = benthic_meta_richness)
+bt_yearmonth_fixed$table
+bt_yearmonth_fixed$global[2] # get global p-value to see if there are changes across all reefs
+
+# I hypothesize that alpha diversity cahnges with disturbance - IT DOES
+bt_disturbance_fixed <- betta(formula = estimate ~ disturbance, 
+                      ses = error, data = benthic_meta_richness)
+bt_disturbance_fixed$table
+bt_disturbance_fixed$global[2] # get global p-value to see if there are overall changes across disturbance
+
+# I hypothesize that season (wet vs. dry) will have a significant impact on alpha diversity - IT DOES NOT
+bt_season_fixed <- betta(formula = estimate ~ wetdryseason, 
+                      ses = error, data = benthic_meta_richness)
+bt_season_fixed$table
+
+# check if the richness changes with disturbance within each reef site (adding in random effects)
+bt_disturbance_fixed_site_random <- betta_random(chats = benthic_meta_richness$estimate,
+                                       ses = benthic_meta_richness$error,
+                                       X = model.matrix(~ disturbance, data = benthic_meta_richness),
+                                       groups = benthic_meta_richness$site)
+bt_disturbance_fixed_site_random$table
+bt_disturbance_fixed_site_random$global[2]
+
+# Check if timepoint is significant within each reef grouping - AKA, does time influence alpha diversity when accounting for site-based differences?
+bt_yearmonth_fixed_reef_random <- betta_random(chats = benthic_meta_richness$estimate,
+                                       ses = benthic_meta_richness$error,
+                                       X = model.matrix(~ yearmonth, data = benthic_meta_richness),
+                                       groups = benthic_meta_richness$site)
+bt_yearmonth_fixed_reef_random$table
+bt_yearmonth_fixed_reef_random$global[2]
+
+## Make graphs that display the different alpha diversity metrics:
+
+b <- ggplot(benthic_meta_richness, aes(x = disturbance, y = estimate)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance), size = 3, alpha = 0.7) +
+  labs(y = "Breakaway estimate of richness", x = "Disturbance", color = "Disturbance", 
+       title = "Figure 5b. Benthic richness") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+
+# Graph disturbance and reef together
+c <- ggplot(benthic_meta_richness, aes(x = disturbance, y = estimate)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = disturbance), size = 3, alpha = 0.7)+
+  facet_wrap(~ site, ncol = 8) +
+  labs(y = "Breakaway estimate of richness", x = "Disturbance", color = "Disturbance", 
+       title = "Figure S8 b. Benthic microbial richness changes with disturbance") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank(),
+        legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+benthicreef <- ggplot(benthic_meta_richness, aes(x = site, y = estimate, fill = disturbance)) +
+  geom_boxplot(outlier.shape = NA) +
+  labs(y = "Breakaway estimate of richness", x = "Reef", fill = "Disturbance") +
+  scale_fill_brewer(palette = "Dark2") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+benthictime <- ggplot(benthic_meta_richness, aes(x = yearmonth, y = estimate)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = site, shape = disturbance), size = 3) +
+  labs(y = "Breakaway estimate of richness", x = "Sampling Timepoint", color = "Reef", shape = "Disturbance") +
+  scale_color_carto_d(palette = "Safe") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+benthicszn <- ggplot(benthic_meta_richness, aes(x = wetdryseason, y = estimate)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = wetdryseason), size = 3) +
+  labs(y = "Breakaway estimate of richness", x = "Season", color = "Season") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank()) 
+
+# Can I get individual p-values and tests of changes in richness on the disturbance within each reef for benthic waters?
+reefs <- benthic_meta_richness$site %>% unique %>% as.character()
+
+betta_disturbance_results <- list()
+global_p <- c()
+for (i in 1:length(reefs)) {
+  reefdata <- benthic_meta_richness %>% 
+    filter(site == reefs[i])
+  bt_disturbance_reef <- betta(formula = estimate ~ disturbance, 
+                      ses = error, data = reefdata)
+  bt_disturbance_reef_table <- bt_disturbance_reef$table
+  betta_disturbance_results[[i]] <- bt_disturbance_reef_table
+  pval <- bt_disturbance_reef$global[2]
+  global_p <- rbind(global_p, pval)
+}
+names(betta_disturbance_results) <- reefs
+```
+From this, I can see that reefs harbor significantly different microbial richness and richness is significantly different across disturbance events, and across disturbance effects when accounting for the random effect of reef. 
+
+### Surface - Does disturbance and reef influence alpha diversity?
+```{r publication figures Alpha diversity surface}
+## SURFACE DATA - USE Alpha diversity phyloseq object from last chunk
+ps.a_surface <- ps.a %>%
+  subset_samples(site != "Sand patch") %>%  # get rid of sandpatch
+  subset_samples(depth == "Surface")        # only interested in benthic data
+
+surface_richness <- ps.a_surface %>% breakaway        # estimate true richness
+
+# Do inference on richness - I hypothesize that richness changes by reef and disturbance
+surface_meta_richness <- ps.a_surface %>%
+  sample_data %>%
+  as_tibble %>%
+  mutate("sample_names" = ps.a_surface %>% sample_names) %>%
+  left_join(summary(surface_richness),
+            by = "sample_names")
+
+# I hypothesize that reef (site) will have a significant impact on alpha diversity - IT DOES
+set.seed(100)
+bt_site_fixed <- betta(formula = estimate ~ site, 
+                      ses = error, data = surface_meta_richness)
+bt_site_fixed$table
+bt_site_fixed$global[2] # get global p-value to see if there are changes across all reefs
+
+# I hypothesize that sampling timepoint (yearmonth, coded as year and month of sampling event) will significanlty influence alpha diversity because of seasonal fluctuations in temperature and rainfall and local conditions and other environmental features that may not be accounted for in the sampling regime. 
+# Overall significant but not different between events. 
+bt_yearmonth_fixed <- betta(formula = estimate ~ yearmonth, 
+                      ses = error, data = surface_meta_richness)
+bt_yearmonth_fixed$table
+bt_yearmonth_fixed$global[2] # get global p-value to see if there are changes across all reefs
+
+# I hypothesize that alpha diversity cahnges with disturbance - IT DOES
+bt_disturbance_fixed <- betta(formula = estimate ~ disturbance, 
+                      ses = error, data = surface_meta_richness)
+bt_disturbance_fixed$table
+bt_disturbance_fixed$global[2] # get global p-value to see if there are overall changes across disturbance
+
+# I hypothesize that season (wet vs. dry) will have a significant impact on alpha diversity - IT DOES NOT
+bt_season_fixed <- betta(formula = estimate ~ wetdryseason, 
+                      ses = error, data = surface_meta_richness)
+bt_season_fixed$table
+
+# check if the richness changes with disturbance within each reef site (adding in random effects)
+bt_disturbance_fixed_site_random <- betta_random(chats = surface_meta_richness$estimate,
+                                       ses = surface_meta_richness$error,
+                                       X = model.matrix(~ disturbance, data = surface_meta_richness),
+                                       groups = surface_meta_richness$site)
+bt_disturbance_fixed_site_random$table
+bt_disturbance_fixed_site_random$global[2]
+
+# Check if timepoint is significant within each reef grouping - AKA, does time influence alpha diversity when accounting for site-based differences?
+bt_yearmonth_fixed_reef_random <- betta_random(chats = surface_meta_richness$estimate,
+                                       ses = surface_meta_richness$error,
+                                       X = model.matrix(~ yearmonth, data = surface_meta_richness),
+                                       groups = surface_meta_richness$site)
+bt_yearmonth_fixed_reef_random$table
+bt_yearmonth_fixed_reef_random$global[2]
+
+## Make graphs that display the different alpha diversity metrics:
+
+surfacereef <- ggplot(surface_meta_richness, aes(x = site, y = estimate, fill = disturbance)) +
+  geom_boxplot(outlier.shape = NA) +
+  labs(y = "Breakaway estimate of richness", x = "Reef", fill = "Disturbance") +
+  scale_fill_brewer(palette = "Dark2") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+surfacetime <- ggplot(surface_meta_richness, aes(x = yearmonth, y = estimate)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = site, shape = disturbance), size = 3) +
+  labs(y = "Breakaway estimate of richness", x = "Sample Timepoint", color = "Reef", shape = "Disturbance") +
+  scale_color_carto_d(palette = "Safe") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
+surfaceszn <- ggplot(surface_meta_richness, aes(x = wetdryseason, y = estimate)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = wetdryseason), size = 3) +
+  labs(y = "Breakaway estimate of richness", x = "Season", color = "Season") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank()) 
+
+
+# Can I get individual p-values and tests of changes in richness on the disturbance within each reef for benthic waters?
+reefs <- surface_meta_richness$site %>% unique %>% as.character()
+
+surface_betta_disturbance_results <- list()
+surface_global_p <- c()
+for (i in 1:length(reefs)) {
+  reefdata <- surface_meta_richness %>% 
+    filter(site == reefs[i])
+  bt_disturbance_reef <- betta(formula = estimate ~ disturbance, 
+                      ses = error, data = reefdata)
+  bt_disturbance_reef_table <- bt_disturbance_reef$table
+  surface_betta_disturbance_results[[i]] <- bt_disturbance_reef_table
+  pval <- bt_disturbance_reef$global[2]
+  global_p <- rbind(global_p, pval)
+}
+names(surface_betta_disturbance_results) <- reefs
+```
+
+# REVISED ALPHA FIGS
+```{r}
+# put the supplementary alpha diversity graphs together 
+ggarrange(ggarrange(benthicreef, surfacereef, common.legend = TRUE, 
+                    labels = c("a. Benthic", "b. Surface")), 
+          ggarrange(benthictime, surfacetime, common.legend = TRUE, 
+                    labels = c("c. Benthic", "d. Surface"), legend = "bottom"), 
+          ncol = 1)
+
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_AlphaDiv.pdf", width = 9, height = 9)
+
+# Put the supplementary alpha diversity season graphs together (will go with a beta diversity graph)
+ggarrange(benthicszn, surfaceszn, common.legend = TRUE, labels = c("b.", "c."))
+```
+
+# REVISED Beta Diversity
+## Beta diversity
+
+### Does depth influence beta diversity?
+Make sure to use the `ps` phyloseq object that has been low abundance filtered so it has about 14,000 taxa
+
+```{r publication figures beta diversity data prep and depth test}
+sample_data(ps)$date <- as.Date(sample_data(ps)$date, tryFormats = c("%m/%d/%y"))
+sample_data(ps)$site <- factor(sample_data(ps)$site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head", "Sand patch"))
+sample_data(ps)$disturbance <- factor(sample_data(ps)$disturbance, levels = c("historic", "hurricane", "disease"))
+sample_data(ps)$depthtype <- factor(sample_data(ps)$depthtype, levels = c("benthic", "surface"))
+
+# remove sand patch from dataset
+ps.beta <- ps %>% subset_samples(site != "Sand patch")
+
+# transform the data
+ps.beta_clr <- microbiome::transform(ps.beta, 'clr')
+ps.beta_clr_euc <- ordinate(ps.beta_clr, "RDA", "euclidean")
+
+# plot PCA
+betadepth <- plot_ordination(ps.beta_clr, ps.beta_clr_euc, 
+                             type="samples", color="depthtype", shape = "disturbance") +
+  coord_fixed() +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(color = "Depth", shape = "Disturbance", title = "Figure S7 a. Beta diversity") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank())
+
+# Do permanova (adonis test) to evaluate effect of reef and disturbance on composition.
+clr_meta <- as(sample_data(ps.beta_clr), "data.frame")
+clr_otu <- otu_table(ps.beta_clr) %>% as.matrix %>% t() #samples must be rows, so transpose
+
+#get dissimilarity matrix 
+euc_diss <- vegdist(clr_otu, method = "euclidean")
+
+# permanova test to evaluate if depth is significantly structures microbial community beta diversity
+set.seed(10)
+adonis2(formula = euc_diss ~ depthtype, data = clr_meta, permutations = 999) 
+```
+From this, I conclude that depth is not a strong driver of changes in microbial community composition. I will proceed with analyses that combine both surface and benthic depth reef waters. 
+
+### Does disturbance, reef, time period, and season influence beta diversity?
+```{r beta diversity disturbance reef}
+# Since it is not significantly different by depth, proceed by combining these together for the analyses:
+# plot PCA showing reef and disturbance and disturbance nested within reef
+plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color= "disturbance") +
+  coord_fixed() +
+  scale_color_brewer(palette = "Dark2") +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(color = "Disturbance", title = "Figure 5a. Beta diversity in benthic and surface reef water", ) +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank())
+
+plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color = "disturbance") +
+  coord_fixed() +
+  facet_wrap(~ site, ncol = 8) +
+  geom_point(size = 3, alpha =  0.7) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(color = "Disturbance", title = "Figure S8 a. PCA on seawater microbial community faceted by reef") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank(), 
+        legend.position = "none")
+
+plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color="wetdryseason", shape = "disturbance") +
+  coord_fixed() +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(color = "Wet or Dry Season", shape = "Disturbance", title = "PCA on surface and benthic microbial community") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank())
+
+plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color = "yearmonth") +
+  coord_fixed() +
+  geom_point(size = 3, alpha =  0.7) +
+  scale_color_viridis_d() + 
+  labs(color = "Sampling Timepoin", title = "Seawater microbial community colored by sampling timepoint") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank())
+
+# Does site and disturbance influence microbial community composition?
+adonis2(formula = euc_diss ~ site, data = clr_meta, permutations = 999) 
+adonis2(formula = euc_diss ~ disturbance, data = clr_meta, permutations = 999) 
+adonis2(formula = euc_diss ~ site/disturbance, data = clr_meta, permutations = 999) #disturbance nested within site
+adonis2(formula = euc_diss ~ wetdryseason, data = clr_meta, permutations = 999)
+adonis2(formula = euc_diss ~ yearmonth, data = clr_meta, permutations = 999)
+
+#Could add in a variance partitioning analysis that investigates the variance explained by disturbance, reef, and time period (maybe season?)
+
+```
+
+# Figure 5 
+Also associated alpha and beta diversity **supplementary graphs**
+```{r diversity}
+# Figure 5
+# Microbial beta diversity, alpha diversity benthic, alpha diversity surface
+ggarrange(betadisturbance, b, e, ncol = 3, labels = c("a.", "b.", "c."), common.legend = TRUE, widths = c(2,1,1))
+#ggsave("figures/Alpha_Beta_Diversity_disturbance.pdf", width = 7.5, height = 4)
+
+# Supplementary Figure S7
+# Microbial beta diversity, alpha diversity depth tests and results
+ggarrange(betadepth, alphadepth, ncol = 2, labels = c("a.", "b."), common.legend = TRUE, widths = c(2,1))
+
+# Supplementary Figure S8
+# Microbial alpha and beta diversity across disturbbances within individual reefs
+ggarrange(betareef, c, f, nrow = 3, labels = c("a.", "b.", "c."), 
+          common.legend = TRUE)
 ```
