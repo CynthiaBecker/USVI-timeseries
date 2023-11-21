@@ -37,6 +37,7 @@ library(phyloseq); packageVersion("phyloseq")
 library(fantaxtic); packageVersion("fantaxtic")
 library(rstatix); packageVersion("rstatix")
 library(FactoMineR); packageVersion("FactoMineR")
+library(missMDA); packageVersion("missMDA")
 library(breakaway); packageVersion("breakaway")
 library(corncob); packageVersion("corncob")
 library(speedyseq); packageVersion("speedyseq")
@@ -44,6 +45,7 @@ library(randomForest); packageVersion("randomForest")
 library(lme4); packageVersion("lme4") # linear mixed effects modeling
 library(lmerTest); packageVersion("lmerTest") # linear mixed effects modeling with p-value calculation
 library(sjPlot) #may be useful for plotting model results from lmer with plot_model(nh4_model, type = "est")
+library(corrplot); packageVersion("corrplot")
 
 
 # For visualization
@@ -238,17 +240,29 @@ coralalgae <- envdata %>%
   drop_na(Algae) %>%
   gather(key = "organism", value = "percentcover", Algae:Coral)
 
-benthos <- ggplot(coralalgae, aes(x = Date, y = percentcover, color = site)) +
+benthos <- ggplot(coralalgae, aes(x = Date, y = percentcover)) +
   geom_vline(xintercept = as.POSIXct(as.Date("2017-09-06")), colour = "gray", linewidth = 3) + # Irma and Maria
   geom_vline(xintercept = as.POSIXct(as.Date("2020-06-01")), colour = "gray", linewidth = 3) + # Bleaching event
-  geom_point(aes(shape = disturbance), data = coralalgae, size = 4) +
-  geom_line(linewidth = 1.2) +
+  geom_point(aes(shape = disturbance, color = site), data = coralalgae, size = 4) +
+  geom_line(aes(color = site), linewidth = 1.2, alpha = 0.7) +
+  geom_smooth(method = "lm", color = "black") +
   scale_color_carto_d(palette = "Safe") +
   facet_wrap( ~ organism, scales = "free_y", ncol = 1) +
   labs(y = "Relative cover", x = "Date", color = "Reef", shape = "Disturbance")
 
 ggarrange(map, benthos, labels = c("a.", "b."), widths = c(2,1), common.legend = TRUE, legend = "bottom")
 ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/Fig1_map_benthos_revised.pdf", width = 9, height = 5)
+
+# Retrieve the linear model results for the trend line so you can report the results
+HCtrend <- lm(percentcover ~ Date, data = filter(coralalgae, organism == "Coral"))
+summary(HCtrend)
+
+HCtrend$coefficients[2]*31556926 # get the estimate in years (need to multiply the # of seconds in a year, 31556926)
+
+Algaetrend <- lm(percentcover ~ Date, data = filter(coralalgae, organism == "Algae"))
+summary(Algaetrend)
+
+Algaetrend$coefficients[2]*31556926 # get the estimate in years (need to multiply the # of seconds in a year, 31556926)
 ```
 
 
@@ -1526,7 +1540,9 @@ ggplot(benthic.forFigures, aes(x = Date, y = value, color = site)) +
   geom_line(linewidth = 1.2) +
   scale_color_carto_d(palette = "Safe") +
   facet_wrap( ~ datatype, scales = "free_y", ncol = 3) +
-  labs(y = "Relative cover", x = "Date", color = "Reef", shape = "Disturbance", title = "Supplementary Figure S15")
+  labs(y = "Relative cover", x = "Date", color = "Reef", shape = "Disturbance", title = "Benthic organism cover over time")
+
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/Benthic_cover_over_time.pdf", width = 10, height = 6)
 
 nuts.forFigures <- env.long.olrm %>%
   filter(datatype %in% nuts_vars) %>%
@@ -1550,12 +1566,15 @@ ggplot(nuts.forFigures, aes(x = Date, y = value, color = site)) +
   geom_line(linewidth = 1.2) +
   scale_color_carto_d(palette = "Safe") +
   facet_wrap( ~ datatype, scales = "free_y", ncol = 4) +
-  ggtitle("Supplementary Figure S17")
+  ggtitle("Nutrients over time")
+
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/Nuts_over_time.pdf", width = 12, height = 6)
 
 cells.forFigures <- env.long.olrm %>%
   filter(datatype %in% cells_vars) %>%
   drop_na(value) %>%
-  mutate(datatype = factor(datatype, levels = c("pro_per_ml","peuk_per_ml","syn_per_ml","hbact_per_ml","biomassRatio")))
+  filter(datatype != "biomassRatio") %>%
+  mutate(datatype = factor(datatype, levels = c("pro_per_ml","peuk_per_ml","syn_per_ml","hbact_per_ml")))
 
 # faceted by reef
 ggplot(cells.forFigures, aes(x = disturbance, y = value)) +
@@ -1573,8 +1592,10 @@ ggplot(cells.forFigures, aes(x = Date, y = value, color = site)) +
   geom_point(aes(shape = depthtype), data = cells.forFigures, size = 4, alpha = 0.8) +
   geom_line(linewidth = 1.2) +
   scale_color_carto_d(palette = "Safe") +
-  facet_wrap( ~ datatype, scales = "free_y", ncol = 3) +
-  labs(y = "Abundance (cells per milliliter)", shape = "Depth", color = "Reef", title = "Supplementary Figure S19") 
+  facet_wrap( ~ datatype, scales = "free_y", ncol = 2) +
+  labs(y = "Abundance (cells per milliliter)", shape = "Depth", color = "Reef", title = "Cell abundances over time") 
+
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/Cells_over_time.pdf", width = 7, height = 6)
 ```
 
 # REVISIONS Figures and Analyses for paper revision
@@ -2838,15 +2859,15 @@ fig2 <- ggarrange(ggarrange(cx, NULL, pcagraph, dy,
           ncol = 2, nrow = 2,  align = "hv", 
           widths = c(4,1), heights = c(1, 4)), 
           a, labels = c("a.", "b."))
-ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/Fig2_benthic_changes.pdf", width = 10, height = 5)
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/Fig2_benthic_changes.pdf", width = 10, height = 5)
 annotate_figure(fig2, top = "Figure 2. Benthic composition at eight reefs significantly changed with disturbances")
 
 # SUPPLEMENTARY FIGURE
 b
-ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_benthic_changes_notsig.pdf")
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_benthic_changes_notsig.pdf")
 # SUPPLEMENTARY FIGURE
 c
-ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_nut_microbe_changes_notsig.pdf", width = 8, height = 7)
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_nut_microbe_changes_notsig.pdf", width = 8, height = 7)
 ```
 ## What about prochloroccocus versus ammonium concentration to go along with the sequence data results?
 
@@ -2937,7 +2958,7 @@ all_pca_viz <- fviz_pca(pca_all,
          repel=TRUE,
          title="PCA of environmental variables",
          legend.title=list(fill="Time")) +
-  scale_fill_viridis(discrete = TRUE) +
+  scale_fill_viridis_d() +
   coord_fixed() +
   theme_bw()
 
@@ -2950,6 +2971,8 @@ yearmonth <- adonis2(allmatrix_vars_noNA ~ yearmonth, data = collinear_remove, m
 yearmonth
 dist <- adonis2(allmatrix_vars_noNA ~ disturbance, data = collinear_remove, method = "eu")
 dist
+depth <- adonis2(allmatrix_vars_noNA ~ depthtype, data = collinear_remove, method = "eu")
+depth
 
 # Save the graph of only ammonium from the LMM analysis
 # Need the CI_df_all data frame
@@ -3490,28 +3513,14 @@ bt_yearmonth_fixed_reef_random$global[2]
 
 ## Make graphs that display the different alpha diversity metrics:
 
-b <- ggplot(benthic_meta_richness, aes(x = disturbance, y = estimate)) +
+benthicdisturbance <- ggplot(benthic_meta_richness, aes(x = disturbance, y = estimate)) +
   geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance), size = 3, alpha = 0.7) +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance, shape = disturbance), size = 3, alpha = 0.7) +
   labs(y = "Breakaway estimate of richness", x = "Disturbance", color = "Disturbance", 
        title = "Figure 5b. Benthic richness") +
   scale_color_brewer(palette = "Dark2") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank()) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
-
-
-# Graph disturbance and reef together
-c <- ggplot(benthic_meta_richness, aes(x = disturbance, y = estimate)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = disturbance), size = 3, alpha = 0.7)+
-  facet_wrap(~ site, ncol = 8) +
-  labs(y = "Breakaway estimate of richness", x = "Disturbance", color = "Disturbance", 
-       title = "Figure S8 b. Benthic microbial richness changes with disturbance") +
-  scale_color_brewer(palette = "Dark2") +
-  theme(panel.grid.minor = element_blank(), 
-        panel.background = element_blank(),
-        legend.position = "none") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
 
 benthicreef <- ggplot(benthic_meta_richness, aes(x = site, y = estimate, fill = disturbance)) +
@@ -3533,8 +3542,8 @@ benthictime <- ggplot(benthic_meta_richness, aes(x = yearmonth, y = estimate)) +
 
 benthicszn <- ggplot(benthic_meta_richness, aes(x = wetdryseason, y = estimate)) +
   geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = wetdryseason), size = 3) +
-  labs(y = "Breakaway estimate of richness", x = "Season", color = "Season") +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = wetdryseason, shape = disturbance), size = 3, alpha = 0.7) +
+  labs(y = "Breakaway estimate of richness", x = "Season", color = "Season", shape = "Disturbance", title = "Benthic richness") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank()) 
 
@@ -3562,7 +3571,7 @@ From this, I can see that reefs harbor significantly different microbial richnes
 ## SURFACE DATA - USE Alpha diversity phyloseq object from last chunk
 ps.a_surface <- ps.a %>%
   subset_samples(site != "Sand patch") %>%  # get rid of sandpatch
-  subset_samples(depth == "Surface")        # only interested in benthic data
+  subset_samples(depth == "Surface")         # only interested in benthic data
 
 surface_richness <- ps.a_surface %>% breakaway        # estimate true richness
 
@@ -3617,6 +3626,16 @@ bt_yearmonth_fixed_reef_random$global[2]
 
 ## Make graphs that display the different alpha diversity metrics:
 
+surfacedisturbance <- ggplot(surface_meta_richness, aes(x = disturbance, y = estimate)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance, shape = disturbance), size = 3, alpha = 0.7) +
+  labs(y = "Breakaway estimate of richness", x = "Disturbance", color = "Disturbance", 
+       title = "Figure 5c. Surface richness") +
+  scale_color_brewer(palette = "Dark2") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+
 surfacereef <- ggplot(surface_meta_richness, aes(x = site, y = estimate, fill = disturbance)) +
   geom_boxplot(outlier.shape = NA) +
   labs(y = "Breakaway estimate of richness", x = "Reef", fill = "Disturbance") +
@@ -3636,8 +3655,8 @@ surfacetime <- ggplot(surface_meta_richness, aes(x = yearmonth, y = estimate)) +
 
 surfaceszn <- ggplot(surface_meta_richness, aes(x = wetdryseason, y = estimate)) +
   geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = wetdryseason), size = 3) +
-  labs(y = "Breakaway estimate of richness", x = "Season", color = "Season") +
+  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = wetdryseason, shape = disturbance), size = 3, alpha = 0.7) +
+  labs(y = "Breakaway estimate of richness", x = "Season", color = "Season", shape = "Disturbance", title = "Surface richness") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank()) 
 
@@ -3658,21 +3677,6 @@ for (i in 1:length(reefs)) {
   global_p <- rbind(global_p, pval)
 }
 names(surface_betta_disturbance_results) <- reefs
-```
-
-# REVISED ALPHA FIGS
-```{r}
-# put the supplementary alpha diversity graphs together 
-ggarrange(ggarrange(benthicreef, surfacereef, common.legend = TRUE, 
-                    labels = c("a. Benthic", "b. Surface")), 
-          ggarrange(benthictime, surfacetime, common.legend = TRUE, 
-                    labels = c("c. Benthic", "d. Surface"), legend = "bottom"), 
-          ncol = 1)
-
-#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_AlphaDiv.pdf", width = 9, height = 9)
-
-# Put the supplementary alpha diversity season graphs together (will go with a beta diversity graph)
-ggarrange(benthicszn, surfaceszn, common.legend = TRUE, labels = c("b.", "c."))
 ```
 
 # REVISED Beta Diversity
@@ -3718,40 +3722,32 @@ From this, I conclude that depth is not a strong driver of changes in microbial 
 
 ### Does disturbance, reef, time period, and season influence beta diversity?
 ```{r beta diversity disturbance reef}
-# Since it is not significantly different by depth, proceed by combining these together for the analyses:
-# plot PCA showing reef and disturbance and disturbance nested within reef
-plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color= "disturbance") +
-  coord_fixed() +
-  scale_color_brewer(palette = "Dark2") +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(color = "Disturbance", title = "Figure 5a. Beta diversity in benthic and surface reef water", ) +
-  theme(panel.grid.minor = element_blank(), 
-        panel.background = element_blank())
+# Investigate changes and drivers to beta diversity
 
-plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color = "disturbance") +
+betareef <- plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color = "disturbance") +
   coord_fixed() +
-  facet_wrap(~ site, ncol = 8) +
+  facet_wrap(~ site, ncol = 4) +
   geom_point(size = 3, alpha =  0.7) +
   scale_color_brewer(palette = "Dark2") +
-  labs(color = "Disturbance", title = "Figure S8 a. PCA on seawater microbial community faceted by reef") +
-  theme(panel.grid.minor = element_blank(), 
-        panel.background = element_blank(), 
-        legend.position = "none")
-
-plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color="wetdryseason", shape = "disturbance") +
-  coord_fixed() +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(color = "Wet or Dry Season", shape = "Disturbance", title = "PCA on surface and benthic microbial community") +
+  labs(color = "Disturbance", title = "PCA on seawater microbial community faceted by reef") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank())
 
-plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color = "yearmonth") +
+betaszn <- plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color="wetdryseason", shape = "disturbance") +
+  coord_fixed() +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(color = "Wet or Dry Season", shape = "Disturbance", title = "Benthic & surface microbial beta diversity") +
+  theme(panel.grid.minor = element_blank(), 
+        panel.background = element_blank())
+
+betamain <- plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color = "yearmonth", shape = "disturbance") +
   coord_fixed() +
   geom_point(size = 3, alpha =  0.7) +
   scale_color_viridis_d() + 
-  labs(color = "Sampling Timepoin", title = "Seawater microbial community colored by sampling timepoint") +
+  labs(color = "Sampling Timepoin", title = "Beta diversity in benthic and surface reef seawater") +
   theme(panel.grid.minor = element_blank(), 
-        panel.background = element_blank())
+        panel.background = element_blank(), 
+        legend.position = "bottom")
 
 # Does site and disturbance influence microbial community composition?
 adonis2(formula = euc_diss ~ site, data = clr_meta, permutations = 999) 
@@ -3760,24 +3756,38 @@ adonis2(formula = euc_diss ~ site/disturbance, data = clr_meta, permutations = 9
 adonis2(formula = euc_diss ~ wetdryseason, data = clr_meta, permutations = 999)
 adonis2(formula = euc_diss ~ yearmonth, data = clr_meta, permutations = 999)
 
-#Could add in a variance partitioning analysis that investigates the variance explained by disturbance, reef, and time period (maybe season?)
-
+#Note: I tried variance partitioning, which employs an RDA analysis to investigate to what degree these different variables contribute to changes in microbial community composition. However, because some of the variables are collinear (makes sense since disturbance, timepoint, and season are all interwoven) I cannot fully trust the results. 
 ```
 
-# Figure 5 
-Also associated alpha and beta diversity **supplementary graphs**
-```{r diversity}
-# Figure 5
-# Microbial beta diversity, alpha diversity benthic, alpha diversity surface
-ggarrange(betadisturbance, b, e, ncol = 3, labels = c("a.", "b.", "c."), common.legend = TRUE, widths = c(2,1,1))
-#ggsave("figures/Alpha_Beta_Diversity_disturbance.pdf", width = 7.5, height = 4)
+# REVISED DIVERSITY FIGS
+```{r}
+# put the supplementary alpha diversity graphs together 
+ggarrange(ggarrange(benthicreef, surfacereef, common.legend = TRUE, 
+                    labels = c("a. Benthic", "b. Surface")), 
+          ggarrange(benthictime, surfacetime, common.legend = TRUE, 
+                    labels = c("c. Benthic", "d. Surface"), legend = "bottom"), 
+          ncol = 1)
 
-# Supplementary Figure S7
-# Microbial beta diversity, alpha diversity depth tests and results
-ggarrange(betadepth, alphadepth, ncol = 2, labels = c("a.", "b."), common.legend = TRUE, widths = c(2,1))
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_AlphaDiv.pdf", width = 9, height = 9)
+```
+
+```{r diversity}
+# Figure 4
+# Microbial beta diversity, alpha diversity benthic, alpha diversity surface
+ggarrange(betamain, 
+          ggarrange(benthicdisturbance, surfacedisturbance, labels = c("b.", "c."), ncol = 2, common.legend = TRUE, legend = "bottom"),
+          ncol = 2, labels = c("a.", "b."))
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/Fig4_Diversity.pdf", width = 9, height = 5)
+
+# Supplementary Figure SXXX
+# Microbial beta diversity, alpha diversity by season
+ggarrange(betaszn, benthicszn, surfaceszn, 
+          ncol = 3, labels = c("a.", "b.", "c."), common.legend = TRUE, widths = c(2,1,1), legend = "bottom")
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_Season_Diversity.pdf", width = 9, height = 5)
 
 # Supplementary Figure S8
 # Microbial alpha and beta diversity across disturbbances within individual reefs
-ggarrange(betareef, c, f, nrow = 3, labels = c("a.", "b.", "c."), 
-          common.legend = TRUE)
+ggarrange(betareef, 
+          common.legend = TRUE, legend = "bottom")
+#ggsave("/Users/cynthiabecker/Documents/Apprill_lab/USVI_Projects/Publication_Figures/EMI_Revision_Figures/SuppFig_Reef_Beta_diversity.pdf", width = 7, height = 5)
 ```
