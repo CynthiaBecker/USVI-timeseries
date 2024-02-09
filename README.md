@@ -25,9 +25,13 @@ Coral reef ecosystems are now commonly affected by major climate and disease dis
 
 ## RAW DATA 
 The raw data associated with this publication can be access from NCBI at:     
-* [BioProject PRJNA936592](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA936592)
+* [BioProject PRJNA936592](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA936592)<br>
 The raw environmental data (nutrients, cell abundances, benthic cover, etc.) can be accessed from BCO-DMO at:     
 * [BCO-DMO Dataset 892971](https://www.bco-dmo.org/dataset/892971)
 
 ## QUESTIONS
 For any questions on the publication or analyses, please contact the corresponding author, aapprill(at)whoi(dot)edu, or contact cynthiabecker(at)ufl(dot)edu for any specific questions relating to the code. 
+
+## GRAPHICAL ABSTRACT
+
+![add graphical abstract](https://github.com/CynthiaBecker/USVI-timeseries/blob/main/figures/EMI_Graphical_Abstract-01.png)
