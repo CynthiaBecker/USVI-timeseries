@@ -1,0 +1,274 @@
+---
+title: "ASV filtering"
+author: "Cynthia Becker"
+date: "11/29/2022"
+output: html_document
+---
+
+# Filtering ASVs
+
+The goal of this code is to filter the raw ASV output from dada2 to remove contaminants, remove chloroplast, eukaryotic, and mitochondria sequences, and finally filter out reads that only show up a few times in the whole dataset. I will not provide the starting data tables in GitHub as they are too large. Instead this code just serves as a record of what I did to filter the dada2 output. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("~/Documents/Apprill_lab/USVI-timeseries/code")
+```
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(phyloseq)
+library(plyr); packageVersion("plyr")
+library(stringr)
+library(decontam)
+```
+# Any functions I create go here:
+```{r functions}
+`%notin%` <- Negate(`%in%`)
+```
+
+
+# Load Data
+```{r unfiltered data}
+asv <- read.table("../data/ASVs.txt", sep = "\t", header = TRUE, row.names = 1)
+taxa <- as.matrix(read.table("../data/taxonomy.txt", sep = "\t", header = TRUE, row.names = 1))
+metadata <- read.table("../data/metadata.txt", sep = "\t", header = TRUE, row.names = 1)
+
+colnames(asv) <- str_replace_all(colnames(asv), pattern = "[X]", "")
+```
+
+# Filter the ASV data so that it is ready for downstream analysis
+1 - remove samples I am uninterested in analyzing: Dock and USVI Blue Water
+2 - remove chloroplasts, eukaryotic, and mitochondria sequences. Also remove any samples where the Kingdom is "NA"
+3 - remove any samples with low sequence reads. If it is around or similar to the dist of control sequences, it needs to be removed
+4 - identify any contaminant ASVs using decontam. Only use the prevalence method I think? I could also use the more quantitative method, but I don't have the qubit data all writted in the metadata yet. 
+
+Note: It is easiest to do a lot of filtering directly on the phyloseq object. So I will do that. 
+```{r phyloseq object}
+#order the metadata so it matches the ASV table
+idx <- match(colnames(asv), rownames(metadata))
+metadata <- metadata[idx,]
+
+ASV = otu_table(asv, taxa_are_rows = TRUE)
+TAX = tax_table(taxa)
+META = sample_data(metadata)
+
+ps <- phyloseq(ASV, TAX, META)
+```
+Initial phyloseq object has 
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 36404 taxa and 408 samples ]
+sample_data() Sample Data:       [ 408 samples by 25 sample variables ]
+tax_table()   Taxonomy Table:    [ 36404 taxa by 7 taxonomic ranks ]
+
+Remove Dock, USVI Blue Water, and mock
+Remove chlorplasts, euks, mitos, and kingdom = NA
+```{r remove samples and bad taxa}
+nrow(tax_table(subset_taxa(ps, Family == "Mitochondria"))) #how many mitochondria = 1235
+nrow(tax_table(subset_taxa(ps, Order == "Chloroplast"))) #how many chloroplasts = 1670
+nrow(tax_table(subset_taxa(ps, is.na(Kingdom)))) #how many NAs in Kingdom = 3
+nrow(tax_table(subset_taxa(ps, is.na(Phylum)))) #how many NAs in Phylum? = 964 - That's a lot. Maybe remove? It's weird to not have an ID at that level, and Im not sure Id do much with it. Maybe keep for now?
+
+ps2 <- ps %>%
+  subset_taxa((Family != "Mitochondria") | is.na(Family)) %>%
+  subset_taxa((Order != "Chloroplast") | is.na(Order)) %>%
+  subset_taxa(!is.na(Kingdom)) %>%
+  subset_samples(site %notin% c("Dock", "USVI Blue Water", "mock"))
+
+ps2
+```
+
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 33448 taxa and 398 samples ]
+sample_data() Sample Data:       [ 398 samples by 25 sample variables ]
+tax_table()   Taxonomy Table:    [ 33448 taxa by 7 taxonomic ranks ]
+
+
+### How should I filter out samples by sequence read?
+
+```{r filter by sequence read}
+hist(metadata$Sequences)
+```
+
+Looks like most sequence reads are betwen 40-80k sequences. Let's look at the samples that are below 10K
+
+```{r}
+lowseqs <- metadata %>% filter(Sequences < 10000)
+highseqs <- metadata %>% filter(Sequences >100000)
+midseqs <- metadata %>% filter(Sequences <30000)
+```
+Which samples (real samples, not controls) have low sequence reads? Do they have a duplicate that remains in the dataset?
+- 1046, 10/23/21 Ram Head Benthic - YES! Duplicate has ~50k reads (added motivation - NMDS shows replicate way off...)
+- 1049, 10/23/21 Tektite Benthic - YES! Duplicate has ~60k reads (added motivation - NMDS shows replicate way off...)
+- USVI125, 10/28/16 Cocoloba Surface - YES! Duplicate has ~50k reads (added motivation - NMDS shows replicate way off...)
+- 574, 4/12/18 Europa Benthic - YES! Duplicate has ~45k reads (added motivation - NMDS shows replicate way off...)
+- 594, 4/13/18 Cocoloba Benthic - YES! Actually this sample was in triplicate, so there are 2 additional replicates. Both hav 50-80k reads (added motivation - NMDS shows replicate way off...)
+
+Knowing this, I will DEFINITELY remove all samples with fewer than 10k reads. 
+
+Which samples have high sequence reads? Do they have a duplicate with a more average read count?
+- 1041, 10/22/21 Yawzi Benthic - YES! Duplicate has ~65k reads (Despite different sampling depth, the replicates are very close in NMDS ordination space. Maybe keep?)
+- 1020, 10/21/21 Joels Shoal Surface - YES! Duplicate has ~45k reads. (Despite different sampling depth, the replicates are close in NMDS ordination space. Maybe keep?)
+
+After checking duplicates and looking at the prelim NMDS graph, I have decided I will remove only those samples with low sequencing reads (<10k)
+
+Also, I need to remove all of Dittlif from 11/8/2018. It is a duplicate sampling event. We also collected surface/benthic from dittlif on 11/6. The environmenal data associated with that site look really weird/abnormal, so I will remove it in favor of the site that looks more "normal".
+
+### Look for contaminants
+
+Use the prevalence method in decontam to look for contaminants and if they are present, remove them
+```{r decontam}
+sample_data(ps2)$is.neg <- sample_data(ps2)$site == "control"
+contamdf.prev <- isContaminant(ps2, method="prevalence", neg="is.neg")
+table(contamdf.prev$contaminant)
+
+hist(contamdf.prev$p) # based on this, I think using 0.2 as the cutoff might be best, since that is where there seems to be a small cluster of prevalence
+
+contamdf.prev02 <- isContaminant(ps2, method="prevalence", neg="is.neg", threshold=0.2)
+table(contamdf.prev02$contaminant)
+```
+
+```{r}
+# Make phyloseq object of presence-absence in negative controls and true samples
+ps.pa <- transform_sample_counts(ps2, function(abund) 1*(abund>0))
+ps.pa.neg <- prune_samples(sample_data(ps.pa)$site == "control", ps.pa)
+ps.pa.pos <- prune_samples(sample_data(ps.pa)$site != "control", ps.pa)
+# Make data.frame of prevalence in positive and negative samples
+df.pa <- data.frame(pa.pos=taxa_sums(ps.pa.pos), pa.neg=taxa_sums(ps.pa.neg),
+                      contaminant=contamdf.prev$contaminant)
+ggplot(data=df.pa, aes(x=pa.neg, y=pa.pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)")
+
+df.pa02 <- data.frame(pa.pos=taxa_sums(ps.pa.pos), pa.neg=taxa_sums(ps.pa.neg),
+                      contaminant=contamdf.prev02$contaminant)
+ggplot(data=df.pa02, aes(x=pa.neg, y=pa.pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)")
+
+# Check out the taxonomy of those contaminants
+tax_table(prune_taxa(contamdf.prev$contaminant, ps2))
+tax_table(prune_taxa(contamdf.prev02$contaminant, ps2)) # I'm concerned that I am getting rid of some endozzoicomonas, a bacterium that is known to be on reefs
+dim(tax_table(subset_taxa(ps2, Genus == "Endozoicomonas"))) #Still have lots of endozoicomonas - 132 ASVs
+```
+Unfortunately, two of the identified contaminants are endozoicomonas contaminants. I am going to proceed because the graph of the 0.2 p prevalence showed definitely that the identified contaminants are more prevalent in controls than actual samples compared to all the other samples. 
+
+Ultimately, this only got rid of a handful of contaminants and is likely not going to make a huge difference in conclusions. 
+
+But I am proceeding with more confidence knowing that the microorganisms that were biased toward control samples are now removed. 
+
+### Remove contaminants and samples with low sequence reads
+
+Armed with information from the previous couple of analyses, I will proceed with removing contaminants at the prevalence p of 0.2 or lower. Additionally, I will remove samples with fewer than 10,000 sequences.
+
+```{r decontam and low sequence removal}
+ps3 <- prune_taxa(!contamdf.prev02$contaminant, ps2) %>%
+  subset_samples(Sequences > 10000) %>%
+  subset_samples(date != "11/8/18")
+ps3
+
+```
+
+## Save data from decontam and samples with low sequences removal - for alpha diversity measures
+```{r save data outputs}
+write.table(as(otu_table(ps3), "matrix"),"../data/ASV_filt.txt",sep="\t",col.names=NA)
+write.table(as(tax_table(ps3), "matrix"),"../data/taxonomy_filt.txt",sep="\t",col.names=NA)
+write.table(as(sample_data(ps3), "matrix"),"../data/metadata_filt.txt",sep="\t",col.names=NA)
+```
+
+
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 33362 taxa and 375 samples ]
+sample_data() Sample Data:       [ 375 samples by 26 sample variables ]
+tax_table()   Taxonomy Table:    [ 33362 taxa by 7 taxonomic ranks ]
+
+
+Note, I still have SO many taxa. 
+I am curious how abundant the taxa are
+```{r}
+taxsum <- taxa_sums(ps3)
+hist(taxsum)
+
+#Check out the histogram after removing the super abundant taxa
+taxsum_minortaxa <- ps3 %>%
+  filter_taxa(function(x) sum(x) < 1e2, TRUE) %>%
+  taxa_sums()
+hist(taxsum_minortaxa)
+```
+Thousands of taxa show up only 20 times or fewer in the ENTIRE dataset. 
+A couple of options here. 
+1 - Remove taxa that show up <5 or <10 times overall in the dataset
+2 - Remove taxa with an average count (over the like 400 samples I have) of 1e-5 (like in the phyloseq tutorial)
+Check out below how many taxa that would remove
+
+## FIlter out low-abundant taxa
+
+```{r filter out low-abundant taxa}
+#Some potential filtering with raw counts
+filter_taxa(ps3, function(x) sum(x) > 10, TRUE) #9k taxa
+filter_taxa(ps3, function(x) sum(x) > 5, TRUE) #14k taxa
+filter_taxa(ps3, function(x) sum(x) > 2, TRUE)
+filter_taxa(ps3, function(x) mean(x) > 1e-2, TRUE)
+
+ps4 <- filter_taxa(ps3, function(x) sum(x) > 5, TRUE) #14k taxa is my final choice
+```
+
+I have decided to remove taxa that are not showing up in 5 sequence reads or fewer in the dataset. Since these data are very zero-inflated, this removes about half of the data. If all 5 of those reads were distributed across samples, that would still only be 5/379 samples, or only 1.3% of samples in this study. 
+
+#### Final phyloseq object output
+phyloseq-class experiment-level object
+otu_table()   OTU Table:          [ 14009 taxa and 375 samples ]:
+sample_data() Sample Data:        [ 375 samples by 40 sample variables ]:
+tax_table()   Taxonomy Table:     [ 14009 taxa by 7 taxonomic ranks ]:
+
+Proceed with the final step of saving the tax table, metadata, and otu table outputs
+## Save the low-abundance (and all other) filtered dataset for most applications like beta diversity and such so analyses are quicker
+```{r save data outputs}
+write.table(as(otu_table(ps4), "matrix"),"../data/ASV_lowabund_filt.txt",sep="\t",col.names=NA)
+write.table(as(tax_table(ps4), "matrix"),"../data/taxonomy_lowabund_filt.txt",sep="\t",col.names=NA)
+write.table(as(sample_data(ps4), "matrix"),"../data/metadata_lowabund_filt.txt",sep="\t",col.names=NA)
+```
+
+## Test reading back in the phyloseq object
+WORKS!!!
+```{r}
+asv <- read.table("../data/ASV_lowabund_filt.txt",sep="\t",header=TRUE, row.names=1)
+taxa <- as.matrix(read.table("../data/taxonomy_lowabund_filt.txt", sep="\t", header=TRUE, row.names=1))
+samples <- read.table("../data/metadata_lowabund_filt.txt",sep="\t",header=T,row.names=1)
+
+colnames(asv) <- str_replace_all(colnames(asv), pattern = "[X]", "")
+
+ASV = otu_table(asv, taxa_are_rows = TRUE)
+TAX = tax_table(taxa)
+META = sample_data(samples)
+
+ps <- phyloseq(ASV, TAX, META)
+ps
+```
+
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 14009 taxa and 375 samples ]
+sample_data() Sample Data:       [ 375 samples by 26 sample variables ]
+tax_table()   Taxonomy Table:    [ 14009 taxa by 7 taxonomic ranks ]
+
+## Test reading back in the phyloseq object that is not low-abundance filtered
+WORKS!!!
+```{r}
+asv <- read.table("../data/ASV_filt.txt",sep="\t",header=TRUE, row.names=1)
+taxa <- as.matrix(read.table("../data/taxonomy_filt.txt", sep="\t", header=TRUE, row.names=1))
+samples <- read.table("../data/metadata_filt.txt",sep="\t",header=T,row.names=1)
+
+colnames(asv) <- str_replace_all(colnames(asv), pattern = "[X]", "")
+
+ASV = otu_table(asv, taxa_are_rows = TRUE)
+TAX = tax_table(taxa)
+META = sample_data(samples)
+
+ps <- phyloseq(ASV, TAX, META)
+ps
+```
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 33362 taxa and 375 samples ]
+sample_data() Sample Data:       [ 375 samples by 26 sample variables ]
+tax_table()   Taxonomy Table:    [ 33362 taxa by 7 taxonomic ranks ]
