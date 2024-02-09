@@ -15,7 +15,7 @@ editor_options:
 ---
 
 ```{r setup, echo=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.retina = 2, fig.path = "figures/fig-")
+knitr::opts_chunk$set(echo = TRUE, fig.retina = 2, fig.path = "figures/fig-rev-")
 setwd("~/Documents/Apprill_lab/USVI-timeseries/")
 ```
 
@@ -205,7 +205,7 @@ extractmods2 <- function(model) {
 }
 ```
 
-# Figure 1.
+# Figure 1
 
 Eight reefs with varying benthic cover in St. John, US Virgin Islands,
 were sampled from 2016 through 2022 surrounding two major disturbances.
@@ -287,7 +287,7 @@ ggplot(sctld, aes(x = site, y = SCTLDprevalence*100, fill = yearmonth)) +
 ```
 
 
-# Figures 2 & 3 - Environmental Data analysis
+# Figures 2 & 3 - Data Prep and Stats Analysis
 
 ## Prepare benthic and environmental data for analysis
 
@@ -620,15 +620,15 @@ therefore only show the code for *Ramicrusta* and picoeukaryotes below.
 
 ### Picoeukaryotes
 
-```{r picoeukaryotes}
+```{r picoeukaryotes, warning=FALSE}
 # analyze picoeukaryotes. In the first model, there were some clear outliers in the residuals that was leading to non-normal data and right-skewed data. 
 # Re-run and check the outliers and results after removing the outliers. 
 vardata <- filter(env.data.foranalysis, datatype == "peuk_per_ml")
   
 model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = vardata)
-
+# Investigate the model output BEFORE removing outliers
 summary(model)
-  
+
 # save the predicted and raw values
 pred <- predict(model)
 res <- residuals(model)
@@ -636,9 +636,7 @@ res.pred.data <- data.frame(pred, res, vardata)
   
 var <- "peuk_per_ml"
   
-# Open a PDF file for saving plots
-# pdf(paste("figures/lmer_figs/", var, "_assumptions.pdf", sep = ""))
-  
+# Investigate the residuals to see if the model meets assumptions
 par(mfrow=c(2,2))
 plot(x = pred, y = res)
 abline(h = 0)
@@ -647,8 +645,6 @@ qqline(res)
 hist(res)
 plot.new()
 text(0.5,0.5, paste(var), cex=2)
-# Close the PDF file
-# dev.off()
 
 # Which samples are the high residuals so I can remove them?
 # set the residual number to remove
@@ -656,22 +652,18 @@ cutoff = 1500
 high.residuals <- res > cutoff
 table(high.residuals) # found the top 3, need to remove
 
-dim(res.pred.data)
 envdata.filt <- res.pred.data[res.pred.data$res < cutoff,]
-dim(envdata.filt)
 
 # Try running the data again with the filtered data and see if it impacts the broad findings:
 model.filt <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = envdata.filt)
 summary(model.filt)
   
-# save the predicted and raw values
+# save the predicted and raw values of the model WITH OUTLIERS REMOVED
 pred.filt <- predict(model.filt)
 res.filt <- residuals(model.filt)
 res.pred.data <- data.frame(pred.filt, res.filt, envdata.filt)
   
-# Open a PDF file for saving plots
-# pdf(paste("figures/lmer_figs/", var, "_assumptions.pdf", sep = ""))
-  
+# Investigate the residuals to see if the model meets assumptions WITH OUTLIERS REMOVED
 par(mfrow=c(2,2))
 plot(x = pred.filt, y = res.filt)
 abline(h = 0)
@@ -680,10 +672,8 @@ qqline(res.filt)
 hist(res.filt)
 plot.new()
 text(0.5,0.5, paste(var), cex=2)
-  # Close the PDF file
-#dev.off()
 
-# Happy with new assumptions, now run the rest of it to find out answers. 
+# Happy with new model with outliers removed because the model assumptions (normal residucals and homogeneity of variances of residuals) is met bettter now run the rest of it to find out answers. 
 
 # Make models with and without the random effects and a null model without disturbance as fixed effect
 notime_model <- lmerTest::lmer(value ~ disturbance + (1|site), data = envdata.filt)
@@ -705,18 +695,8 @@ colnames(cife) <- c("lower", "upper", "fixedeff", "disturbance")
 cife$disturbance <- factor(cife$disturbance, levels = c("historic", "hurricane", "disease"))
 
 cife_noIntercept <- cife[2:3,]
-  
-# Plot the coefficients with the confidence intervals (95%). If they go through zero that indicates less confidence in the change
-p5 <- ggplot(cife_noIntercept, aes(x = disturbance, y = fixedeff, color = disturbance)) +
-    geom_hline(yintercept = 0, color = "#1B9E77", size = 1) +
-    geom_point(size = 5) +
-    geom_errorbar(data = cife_noIntercept, aes(ymin = lower, ymax = upper), width = 0.2, size = 1.5) +
-    scale_color_manual(values = c("#D95F02", "#7570B3")) +
-    labs(x = "Disturbance", y = "Estimate with 95% CI relative to Historic", title = paste(var))
 
-p5
-
-# Save the picoeukaryote data 
+# Save the picoeukaryote data to add it back with the other model information
 cife_Peuk_per_ml <- tibble("variable" = c("peuk_per_ml", "peuk_per_ml"), cife_noIntercept)
 ```
 
@@ -731,13 +711,13 @@ assumptions.
 
 ### Ramicrusta
 
-```{r Ramicrusta}
+```{r Ramicrusta, warning=FALSE}
 # analyze Ramicrusta.  In the first model, there were some outliers in the residuals that was leading to non-normal data and right-skewed data. 
 # Re-run and check the outliers and results after removing the outliers. 
 vardata <- filter(env.data.foranalysis, datatype == "Ramicrusta")
   
 model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = vardata)
-
+# Investigate the model output BEFORE removing outliers
 summary(model)
   
 # save the predicted and raw values
@@ -746,10 +726,8 @@ res <- residuals(model)
 res.pred.data <- data.frame(pred, res, vardata)
   
 var <- "Ramicrusta"
-  
-# Open a PDF file for saving plots
-# pdf(paste("figures/lmer_figs/", var, "_assumptions.pdf", sep = ""))
-  
+
+# Investigate the residuals to see if the model meets assumptions
 par(mfrow=c(2,2))
 plot(x = pred, y = res)
 abline(h = 0)
@@ -758,8 +736,6 @@ qqline(res)
 hist(res)
 plot.new()
 text(0.5,0.5, paste(var), cex=2)
-# Close the PDF file
-# dev.off()
 
 # Which samples are the high residuals so I can remove them?
 # set the residual number to remove
@@ -767,22 +743,18 @@ cutoff = 0.1
 high.residuals <- res > cutoff
 table(high.residuals) # found the top 3, need to remove
 
-dim(res.pred.data)
 envdata.filt <- res.pred.data[res.pred.data$res < cutoff,]
-dim(envdata.filt)
 
 # Try running the data again with the filtered data and see if it impacts the broad findings:
 model.filt <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = envdata.filt)
 summary(model.filt)
   
-# save the predicted and raw values
+# save the predicted and raw values WITH OUTLIERS REMOVED
 pred.filt <- predict(model.filt)
 res.filt <- residuals(model.filt)
 res.pred.data <- data.frame(pred.filt, res.filt, envdata.filt)
   
-# Open a PDF file for saving plots
-# pdf(paste("figures/lmer_figs/", var, "_assumptions.pdf", sep = ""))
-  
+# Investigate the residuals to see if the model meets assumptions WITH OUTLIERS REMOVED
 par(mfrow=c(2,2))
 plot(x = pred.filt, y = res.filt)
 abline(h = 0)
@@ -791,10 +763,8 @@ qqline(res.filt)
 hist(res.filt)
 plot.new()
 text(0.5,0.5, paste(var), cex=2)
-  # Close the PDF file
-#dev.off()
 
-# Happy with new assumptions, now run the rest of it to find out answers. 
+# Happy with new model with outliers removed because the model assumptions (normal residucals and homogeneity of variances of residuals) is met better so now run the rest of it to find out answers. 
 
 # Make models with and without the random effects and a null model without disturbance as fixed effect
 notime_model <- lmerTest::lmer(value ~ disturbance + (1|site), data = envdata.filt)
@@ -816,18 +786,6 @@ colnames(cife) <- c("lower", "upper", "fixedeff", "disturbance")
 cife$disturbance <- factor(cife$disturbance, levels = c("historic", "hurricane", "disease"))
 
 cife_noIntercept <- cife[2:3,]
-  
-# Plot the coefficients with the confidence intervals (95%). If they go through zero that indicates less confidence in the change
-p5 <- ggplot(cife_noIntercept, aes(x = disturbance, y = fixedeff, color = disturbance)) +
-    geom_hline(yintercept = 0, color = "#1B9E77", size = 1) +
-    geom_point(size = 5) +
-    geom_errorbar(data = cife_noIntercept, aes(ymin = lower, ymax = upper), width = 0.2, size = 1.5) +
-    scale_color_manual(values = c("#D95F02", "#7570B3")) +
-    labs(x = "Disturbance", y = "Estimate with 95% CI relative to Historic", title = paste(var))
-
-p5
-
-ggsave(paste("figures/lmer_figs/", var, "_no_outlier_estimate_CI.pdf", sep = ""), plot = p5, height = 3, width = 3)
 
 cife_Ramicrusta <- tibble("variable" = c("Ramicrusta", "Ramicrusta"), cife_noIntercept)
 ```
@@ -842,7 +800,9 @@ p\<0.10. Ultimately, I conclude that I will move forward with removing
 the outliers as it improved the assumptions of the model, which also
 changed the conclusions.
 
-## Figure 2 and Associated Supplementary Figures
+## Figure 2
+
+Benthic composition at eight reefs significantly changed with disturbances in St. John, US Virgin Islands. 
 
 ```{r}
 # need confidence interval data from LMM for loop
@@ -873,32 +833,6 @@ a <- ggplot(CI_df_fig2, aes(x = disturbance, y = fixedeff, color = disturbance))
     scale_color_manual(values = c("#D95F02", "#7570B3")) +
     facet_wrap(. ~ variable, scales = "free", ncol = 2) +
     labs(x = "Disturbance", y = "Estimate with 95% CI relative to Historic")
-
-# 2. Supplementary figure of all the benthic components that werent significantly distinct
-CI_df_suppfig1 <- CI_df_all %>%
-  filter(variable %in% c("HardCoral", "SoftCoral", "AlgaeToCoral")) %>%
-  mutate(variable = factor(variable, levels = c("HardCoral", "SoftCoral", "AlgaeToCoral")))
-
-b <- ggplot(CI_df_suppfig1, aes(x = disturbance, y = fixedeff, color = disturbance)) +
-    geom_hline(yintercept = 0, color = "#1B9E77", size = 1) +
-    geom_point(size = 5) +
-    geom_errorbar(data = CI_df_suppfig1, aes(ymin = lower, ymax = upper), width = 0.2, size = 1.5) +
-    scale_color_manual(values = c("#D95F02", "#7570B3")) +
-    facet_wrap(. ~ variable, scales = "free", ncol = 3) +
-    labs(x = "Disturbance", y = "Estimate with 95% CI relative to Historic", title = "Supp Fig. Benthic components not significantly different with disturbance")
-
-# 3. Supplementary figure of all the nutrients and cell abundances that weren't significantly different (all but ammonium)
-CI_df_suppfig2 <- CI_df_all %>%
-  filter(variable %in% c("po4_um", "silicate_um", "no2_um", "pro_per_ml", "syn_per_ml", "hbact_per_ml", "TON", "npoc_um", "Chl_ug_per_l", "no3_um", "peuk_per_ml")) %>%
-  mutate(variable = factor(variable, levels = c("pro_per_ml", "syn_per_ml", "peuk_per_ml", "hbact_per_ml", "silicate_um", "npoc_um", "TON",  "Chl_ug_per_l", "no2_um", "no3_um", "po4_um")))
-
-c <- ggplot(CI_df_suppfig2, aes(x = disturbance, y = fixedeff, color = disturbance)) +
-    geom_hline(yintercept = 0, color = "#1B9E77", size = 1) +
-    geom_point(size = 5) +
-    geom_errorbar(data = CI_df_suppfig2, aes(ymin = lower, ymax = upper), width = 0.2, size = 1.5) +
-    scale_color_manual(values = c("#D95F02", "#7570B3")) +
-    facet_wrap(. ~ variable, scales = "free", ncol = 4) +
-    labs(x = "Disturbance", y = "Estimate with 95% CI relative to Historic", title = "Supp Fig. Nutrients and microbes not significantly different with disturbance")
 
 ## Conduct a PCA
 benthic <- envdata %>%
@@ -947,7 +881,6 @@ dy <- ggplot(pcaAll, aes(x = disturbance, y = Dim.2, fill = disturbance)) +
   clean_theme() +
   theme(legend.position = "none")
 
-# FIGURE 2
 # Arranging the plot
 fig2 <- ggarrange(ggarrange(cx, NULL, pcagraph, dy, 
           ncol = 2, nrow = 2,  align = "hv", 
@@ -972,38 +905,53 @@ date[1,]
 # Does sampling timepoint (categorical) influence benthic composition
 timepoint <- adonis2(pca_data_short_final ~ yearmonth, data = benthic, method = "eu")
 timepoint[1,]
+```
 
-# SUPPLEMENTARY FIGURES
+## Supplementary Figure S3
+```{r}
+# 2. Supplementary figure of all the benthic components that werent significantly distinct
+# Uses code from a previous chunk and results from the linear mixed effects modeling approach
+CI_df_suppfig1 <- CI_df_all %>%
+  filter(variable %in% c("HardCoral", "SoftCoral", "AlgaeToCoral")) %>%
+  mutate(variable = factor(variable, levels = c("HardCoral", "SoftCoral", "AlgaeToCoral")))
+
+b <- ggplot(CI_df_suppfig1, aes(x = disturbance, y = fixedeff, color = disturbance)) +
+    geom_hline(yintercept = 0, color = "#1B9E77", size = 1) +
+    geom_point(size = 5) +
+    geom_errorbar(data = CI_df_suppfig1, aes(ymin = lower, ymax = upper), width = 0.2, size = 1.5) +
+    scale_color_manual(values = c("#D95F02", "#7570B3")) +
+    facet_wrap(. ~ variable, scales = "free", ncol = 3) +
+    labs(x = "Disturbance", y = "Estimate with 95% CI relative to Historic", title = "Figure S3. Benthic components not significantly different with disturbance")
+
 b
+```
 
-# SUPPLEMENTARY FIGURE
+##  Supplementary Figure S5
+```{r}
+# 3. Supplementary figure of all the nutrients and cell abundances that weren't significantly different (all but ammonium)
+# Uses code from a previous chunk and results from the linear mixed effects modeling approach
+
+CI_df_suppfig2 <- CI_df_all %>%
+  filter(variable %in% c("po4_um", "silicate_um", "no2_um", "pro_per_ml", "syn_per_ml", "hbact_per_ml", "TON", "npoc_um", "Chl_ug_per_l", "no3_um", "peuk_per_ml")) %>%
+  mutate(variable = factor(variable, levels = c("pro_per_ml", "syn_per_ml", "peuk_per_ml", "hbact_per_ml", "silicate_um", "npoc_um", "TON",  "Chl_ug_per_l", "no2_um", "no3_um", "po4_um")))
+
+c <- ggplot(CI_df_suppfig2, aes(x = disturbance, y = fixedeff, color = disturbance)) +
+    geom_hline(yintercept = 0, color = "#1B9E77", size = 1) +
+    geom_point(size = 5) +
+    geom_errorbar(data = CI_df_suppfig2, aes(ymin = lower, ymax = upper), width = 0.2, size = 1.5) +
+    scale_color_manual(values = c("#D95F02", "#7570B3")) +
+    facet_wrap(. ~ variable, scales = "free", ncol = 4) +
+    labs(x = "Disturbance", y = "Estimate with 95% CI relative to Historic", title = "Figure S5. Nutrients and microbes not significantly different with disturbance")
+
 c
 ```
 
-## Supplementary Figure - Pro vs. Ammonium
 
-```{r pro vs nh4, warning=FALSE}
-pronh4 <- envdata %>%
-  filter(site != "USVI Blue Water") %>%
-  dplyr::select(Date, site, siteacronym, yearmonth, disturbance, pro_per_ml, nh4_um) %>%
-  mutate(site = factor(site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head", "Sand patch"))) %>%
-  filter(site != "Sand patch") %>% #no need to calculate sand patch stuff
-  mutate(disturbance = factor(disturbance, levels = c("historic", "hurricane", "disease"))) %>%
-  filter(nh4_um < 0.8) # remove outlier/high ammonium values removed from environmental data analysis 
 
-ggplot(pronh4, aes(x = nh4_um, y = pro_per_ml)) +
-  geom_point(aes(color = disturbance), size = 2) +
-  geom_smooth(method = "lm", se = FALSE, color = "black") +
-  ylim(0,150000) +
-  scale_color_brewer(palette = "Dark2") +
-  labs(x = "Ammonium (uM)", y = "Prochlorococcus abundance (cells ml-1)", color = "Disturbance")
-
-lm <- lm(pro_per_ml ~ nh4_um, data = pronh4)
-summary(lm)
-```
 
 ## Figure 3 Code
 
+First investigate the collinearity of the environmental variables, and remove variables that are highly collinear before moving on to the PCA analysis. 
 ```{r}
 ## Look at pairwise correlation between the variables in all the environmental data
 data_cor_all <- envdata %>%                        
@@ -1089,17 +1037,18 @@ ggarrange(all_pca_viz, ggarrange(nh4, NULL, ncol = 1),
 
 #Use vegan for the PERMANOVA tests on benthic pca stuff - PCAs are made with euclidian distance so use adonis function but make sure method = "eu
 # Report statistics to go with graph
+# Does site (reef) influence envionrmental variables?
 site <- adonis2(allmatrix_vars_noNA ~ site, data = collinear_remove, method = "eu")
 site[1,]
+# Does sampling timepoint (yearmonth) influence environmental variables?
 yearmonth <- adonis2(allmatrix_vars_noNA ~ yearmonth, data = collinear_remove, method = "eu")
 yearmonth[1,]
+# Does disturbance influence environmental variables?
 dist <- adonis2(allmatrix_vars_noNA ~ disturbance, data = collinear_remove, method = "eu")
 dist[1,]
-depth <- adonis2(allmatrix_vars_noNA ~ depthtype, data = collinear_remove, method = "eu")
-depth[1,]
 ```
 
-# Figure 4 - Alpha & Beta Diversity
+# Figure 4 - Data Prep and Stats for Alpha & Beta Diversity
 
 ## Alpha diversity
 
@@ -1140,7 +1089,7 @@ alphadepth <- ggplot(meta_richness, aes(x = depthtype, y = estimate)) +
   geom_boxplot(outlier.shape = NA) +
   geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = depthtype, shape = disturbance), size = 3, alpha = 0.7) +
   labs(y = "Breakaway estimate of richness", x = "Disturbance", color = "Depth", shape = "Disturbance", 
-       title = "Benthic microbial richness changes with disturbance") +
+       title = "Figure S8") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank()) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
@@ -1206,7 +1155,7 @@ benthicdisturbance <- ggplot(benthic_meta_richness, aes(x = disturbance, y = est
   geom_boxplot(outlier.shape = NA) +
   geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance, shape = disturbance), size = 3, alpha = 0.7) +
   labs(y = "Breakaway estimate of richness", x = "Disturbance", color = "Disturbance", 
-       title = "Figure 5b. Benthic richness") +
+       title = "Fig 4. Benthic richness") +
   scale_color_brewer(palette = "Dark2") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank()) +
@@ -1286,7 +1235,7 @@ surfacedisturbance <- ggplot(surface_meta_richness, aes(x = disturbance, y = est
   geom_boxplot(outlier.shape = NA) +
   geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance, shape = disturbance), size = 3, alpha = 0.7) +
   labs(y = "Breakaway estimate of richness", x = "Disturbance", color = "Disturbance", 
-       title = "Figure 5c. Surface richness") +
+       title = "Fig 4. Surface richness") +
   scale_color_brewer(palette = "Dark2") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank()) +
@@ -1349,7 +1298,7 @@ betadepth <- plot_ordination(ps.beta_clr, ps.beta_clr_euc,
                              type="samples", color="depthtype", shape = "disturbance") +
   coord_fixed() +
   geom_point(size = 3, alpha = 0.7) +
-  labs(color = "Depth", shape = "Disturbance", title = "Figure S7 a. Beta diversity") +
+  labs(color = "Depth", shape = "Disturbance", title = "Figure S8. Beta diversity") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank())
 
@@ -1379,14 +1328,7 @@ betareef <- plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color 
   facet_wrap(~ site, ncol = 4) +
   geom_point(size = 3, alpha =  0.7) +
   scale_color_brewer(palette = "Dark2") +
-  labs(color = "Disturbance", title = "PCA on seawater microbial community faceted by reef") +
-  theme(panel.grid.minor = element_blank(), 
-        panel.background = element_blank())
-
-betaszn <- plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color="wetdryseason", shape = "disturbance") +
-  coord_fixed() +
-  geom_point(size = 3, alpha = 0.7) +
-  labs(color = "Wet or Dry Season", shape = "Disturbance", title = "Benthic & surface microbial beta diversity") +
+  labs(color = "Disturbance", title = "Figure S7. PCA on seawater microbial community faceted by reef") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank())
 
@@ -1394,7 +1336,7 @@ betamain <- plot_ordination(ps.beta_clr, ps.beta_clr_euc, type="samples", color 
   coord_fixed() +
   geom_point(size = 3, alpha =  0.7) +
   scale_color_viridis_d() + 
-  labs(color = "Sampling Timepoin", title = "Beta diversity in benthic and surface reef seawater") +
+  labs(color = "Sampling Timepoin", title = "Beta diversity in benthic & surface sw") +
   theme(panel.grid.minor = element_blank(), 
         panel.background = element_blank(), 
         legend.position = "bottom")
@@ -1411,6 +1353,16 @@ reef[1,]
 # Does disturbance nested within site influence microbiome composition?
 nested <- adonis2(formula = euc_diss ~ site/disturbance, data = clr_meta, permutations = 999) #disturbance nested within site
 nested[1,]
+```
+
+## Figure 4
+
+```{r diversity}
+# Figure 4
+# Microbial beta diversity, alpha diversity benthic, alpha diversity surface
+ggarrange(betamain, 
+          ggarrange(benthicdisturbance, surfacedisturbance, labels = c("b.", "c."), ncol = 2, common.legend = TRUE, legend = "bottom"),
+          ncol = 2, labels = c("a.", "b."))
 
 ```
 
@@ -1442,18 +1394,7 @@ ggarrange(ggarrange(benthicreef, surfacereef, common.legend = TRUE,
           ncol = 1)
 ```
 
-## Figure 4
-
-```{r diversity}
-# Figure 4
-# Microbial beta diversity, alpha diversity benthic, alpha diversity surface
-ggarrange(betamain, 
-          ggarrange(benthicdisturbance, surfacedisturbance, labels = c("b.", "c."), ncol = 2, common.legend = TRUE, legend = "bottom"),
-          ncol = 2, labels = c("a.", "b."))
-
-```
-
-# Figures 5 & 6 - Sensitive and Predictive Analysis
+# Figures 5 & 6 - Data Prep and Stats - Sensitive and Predictive Analysis
 
 One of the main findings was the enrichment of ammonium following
 disturbances. Ammonium is readily assimilated by microorganisms and may
@@ -1584,7 +1525,7 @@ ps.surface.nh4.narm.filt <- ps.nh4.narm %>%
 
 ## Random forest model and testing
 
-```{r RF model}
+```{r RF model, warning=FALSE}
 ## RANDOM FOREST ANALYSIS ##
 # get the ASVs as columns and samples as rows, which are the predictors
 predictors <- t(otu_table(ps.benthic.nh4.narm.filt))
@@ -1642,9 +1583,6 @@ mse_predict
 mse_model <- mean((nh4.RF$predicted-resp.pred$response)^2) #on the benthic data - direct from the model with data used to train model
 # THIS IS PRETTY LOW COMPARED TO THE ONLINE TUTORIALS I AM FINDING
 mse_model
-
-benthRFplot
-surfRFplot
 ```
 
 ## Save the top 50 predictive taxa
@@ -1720,7 +1658,7 @@ when they are removed.
 
 ## Supplementary Figure S11
 
-```{r}
+```{r, warning=FALSE}
 # Combine the top 50 plot with the regression model plots
 supp <- ggarrange(ggarrange(benthRFplot, surfRFplot, 
           ncol = 1, nrow = 2, labels = c("a.", "b.")), 
@@ -1796,7 +1734,7 @@ wrap_plots(a, b, widths = c(1,1))
 Relative abundance of shared sensitive (differentially abundant) and
 predictive (random forests) taxa in relation to ammonium
 
-```{r}
+```{r, warning=FALSE}
 # Shared is from the section on "How many ASVs were shared?"
 # prep the data
 ASVshared <- shared %>%
@@ -1842,7 +1780,27 @@ ggplot(shared.ra.long, aes(x = nh4, y = .abundance)) +
         legend.position = "bottom")
 ```
 
-# 
+# Supplementary Figure S12 - Pro vs ammonium
+
+```{r pro vs nh4, warning=FALSE}
+pronh4 <- envdata %>%
+  filter(site != "USVI Blue Water") %>%
+  dplyr::select(Date, site, siteacronym, yearmonth, disturbance, pro_per_ml, nh4_um) %>%
+  mutate(site = factor(site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head", "Sand patch"))) %>%
+  filter(site != "Sand patch") %>% #no need to calculate sand patch stuff
+  mutate(disturbance = factor(disturbance, levels = c("historic", "hurricane", "disease"))) %>%
+  filter(nh4_um < 0.8) # remove outlier/high ammonium values removed from environmental data analysis 
+
+ggplot(pronh4, aes(x = nh4_um, y = pro_per_ml)) +
+  geom_point(aes(color = disturbance), size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  ylim(0,150000) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(x = "Ammonium (uM)", y = "Prochlorococcus abundance (cells ml-1)", color = "Disturbance", title = "Figure S12. Prochlorococcus vs. Ammonium")
+
+lm <- lm(pro_per_ml ~ nh4_um, data = pronh4)
+summary(lm)
+```
 
 # Supplementary Figure S13 - temperature
 
@@ -1917,7 +1875,7 @@ ggplot(precip2016to2022, aes(x = DATE, y = PRCP)) +
   labs(x = "Date", y = "Precipitation", title = "Figure S14. Monthly precipitation at East End, US Virgin Islands")
 ```
 
-# Supplementary Figure S2
+# Supplementary Figure S2 - benthic cover over time
 ```{r extra_supplementary_figs}
 benthic_vars <- c("Ramicrusta","TurfAlgae","Macroalgae","HardCoral","SoftCoral")
 benthic.forFigures <- env.long.olrm %>%
@@ -1934,10 +1892,10 @@ ggplot(benthic.forFigures, aes(x = Date, y = value, color = site)) +
   geom_line(linewidth = 1.2) +
   scale_color_carto_d(palette = "Safe") +
   facet_wrap( ~ datatype, scales = "free_y", ncol = 3) +
-  labs(y = "Relative cover", x = "Date", color = "Reef", shape = "Disturbance", title = "Benthic organism cover over time")
+  labs(y = "Relative cover", x = "Date", color = "Reef", shape = "Disturbance", title = "Figure S2. Benthic organism cover over time")
 ```
 
-# Supplementary Figure S4
+# Supplementary Figure S4 - environmental nutrient data over time
 ```{r}
 nuts_vars <- c("nh4_um","TON","Chl_ug_per_l","po4_um","silicate_um", "npoc_um","no2_um", "no3_um")
 nuts.forFigures <- env.long.olrm %>%
@@ -1953,10 +1911,10 @@ ggplot(nuts.forFigures, aes(x = Date, y = value, color = site)) +
   geom_line(linewidth = 1.2) +
   scale_color_carto_d(palette = "Safe") +
   facet_wrap( ~ datatype, scales = "free_y", ncol = 4) +
-  ggtitle("Nutrients over time")
+  ggtitle("Figure S4. Nutrients over time")
 ```
 
-# Supplementary Figure S6
+# Supplementary Figure S6 - microbial cell abundances over time
 ```{r}
 cells_vars <- c("pro_per_ml","peuk_per_ml","syn_per_ml","hbact_per_ml")
 cells.forFigures <- env.long.olrm %>%
@@ -1973,952 +1931,8 @@ ggplot(cells.forFigures, aes(x = Date, y = value, color = site)) +
   geom_line(linewidth = 1.2) +
   scale_color_carto_d(palette = "Safe") +
   facet_wrap( ~ datatype, scales = "free_y", ncol = 2) +
-  labs(y = "Abundance (cells per milliliter)", shape = "Depth", color = "Reef", title = "Cell abundances over time") 
+  labs(y = "Abundance (cells per milliliter)", shape = "Depth", color = "Reef", title = "Figure S6. Cell abundances over time") 
 ```
 
 
 
-
-
-
-
-# STUFF I WILL REMOVE SINCE IT DIDN';T MAKE IT INTO THE FINAL ANALYSIS OF THE PUBLISHED PAPER
-
-## ANOVA or Kruskal Wallis tests
-
-Based on the previous results it makes sense to combine the benthic and
-surface values. Most of the values are NOT different between surface and
-benthic. Since they aren't much different, I will combine them for the
-ANOVA and Kruskal-Wallis tests. This will make it easier to interpret and
-actually addresses the main questions I am interested in.
-
-Default asterisk values are as follows: \<0.05 = *\<0.01 = **\<0.001 =***
-\<0.0001 = \*\*\*\*
-
-```{r ANOVA KW stats}
-env.data.foranalysis <- env.long.olrm %>%
-  filter(datatype != "SCTLDprevalence") %>%
-  filter(datatype != "BenthicAlgae") %>%
-  filter(datatype != "coral") %>%
-  filter(datatype != "cellRatio") %>%
-  drop_na(value) %>%
-  filter(value != "Inf")
-
-# check if data are normally distributed. This is an assumption of the ANOVA test
-normal <- env.data.foranalysis %>%
-  group_by(datatype, disturbance) %>%
-  shapiro_test(value) %>% 
-  mutate(normal = ifelse(p < 0.05, "not_normal", "yes_normal")) %>%
-  dplyr::select(datatype, disturbance, normal) %>%
-  spread(key = "disturbance", value = "normal")
-
-# Check for homogeneity of variances. This is an assumption of the ANOVA test
-variance <- env.data.foranalysis %>%
-  group_by(datatype) %>%
-  levene_test(value ~ disturbance, center = median) %>% 
-  mutate(equalvariance = ifelse(p < 0.05, "no", "yes")) %>%
-  dplyr::select(datatype, equalvariance)
-
-# ANOVA results
-anova <- env.data.foranalysis %>%
-  group_by(datatype) %>%
-  do(tidy(aov(.$value ~ .$disturbance))) %>%
-  filter(term == ".$disturbance") %>%
-  mutate(sig05 = ifelse(p.value < 0.05, "yes", "no")) %>%
-  dplyr::select(datatype, sig05, p.value) %>%
-  dplyr::rename(p = p.value)
-
-# Pairwise results with the Tukey Honest significant differences
-ANOVA.tukey <- env.data.foranalysis %>%
-  group_by(datatype) %>%
-  tukey_hsd(value ~ disturbance) %>%
-  mutate(TukeyHSDtest = paste0(group1, "-", group2), 
-         p.adj.signif = paste("Tukey", p.adj.signif)) %>%
-  dplyr::select(datatype, TukeyHSDtest, p.adj.signif) %>%
-  spread(key = "TukeyHSDtest", value = "p.adj.signif") %>%
-  left_join(anova, by = "datatype")
-
-# Do kruskal wallis test since for many of the variables, the assumptions are not met for an ANOVA
-KW <- env.data.foranalysis %>%
-  group_by(datatype) %>%
-  kruskal_test(value ~ disturbance) %>%
-  mutate(sig05 = ifelse(p < 0.05, "yes", "no")) %>%
-  dplyr::select(datatype, sig05, p)
-
-# Dunns post-hoc test
-KW.dunn <- env.data.foranalysis %>%
-  group_by(datatype) %>%
-  dunn_test(value ~ disturbance) %>%
-  mutate(DunnPostHoc = paste0(group1, "-", group2), 
-         p.adj.signif = paste("Dunn", p.adj.signif)) %>%
-  dplyr::select(datatype, DunnPostHoc, p.adj.signif) %>%
-  spread(key = "DunnPostHoc", value = "p.adj.signif") %>%
-  left_join(KW, by = "datatype")
-
-#put it all together and summarize p-values
-statresults <- normal %>%
-  left_join(variance, by = "datatype") %>%
-  mutate(test2use = ifelse(historic == "yes_normal" & hurricane == "yes_normal" & disease == "yes_normal" & equalvariance == "yes", "ANOVA", "Kruskal-Wallis"))
-
-statresults.ANOVA <- statresults %>%
-  filter(test2use == "ANOVA") %>%
-  left_join(ANOVA.tukey, by = "datatype")
-
-statresults.KW <- statresults %>%
-  filter(test2use == "Kruskal-Wallis") %>%
-  left_join(KW.dunn, by = "datatype")
-
-statsummaries <- bind_rows(statresults.ANOVA, statresults.KW) %>%
-  mutate(sig01 = ifelse(p < 0.01, "yes", "no")) %>%
-  mutate(sigBonf = ifelse(p < (0.05/nrow(statresults)), "yes", "no"))
-
-kable(statsummaries)
-```
-
-## Benthic changes with disturbance
-
-```{r benthic}
-## Conduct a PCA
-benthic <- envdata %>%
-  filter(site != "USVI Blue Water") %>%
-  dplyr::select(Date, site, siteacronym, depthtype, yearmonth, disturbance, BleachCoral, CCA, CYAN, DiseasedCoral, HardCoral, Macroalgae, Other, Ramicrusta, SoftCoral, Sponge, Substrate, TurfAlgae) %>%
-  mutate(site = factor(site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head", "Sand patch"))) %>%
-  drop_na(HardCoral) %>%
-  filter(site != "Sand patch") %>% #no need to calculate sand patch stuff
-  mutate(Other = Other + BleachCoral) %>% # add bleached coral to the grouping with Other
-  dplyr::select(-BleachCoral) #no need for this section
-
-# Prep the benthic data 
-pca_data_short_final <- as.matrix(benthic) #change from tibble to matrix
-rownames(pca_data_short_final) <- pca_data_short_final[,3] #make rownames the unique sites
-pca_data_short_final <- pca_data_short_final[,7:17] #select numeric variables
-class(pca_data_short_final) <- "numeric" #change from character to numeric values for pca
-
-#Do the PCA
-pca <- PCA(pca_data_short_final, scale.unit=TRUE, graph = FALSE) #performs the Principal component analysis #scale.unit=TRUE then data are scaled to unit variance
-
-# how many dimensions explain the data?
-# fviz_eig(pca) #1st dimension is most. 2,3,and 4 are a lot of them too
-
-#All pca values for density plots to acompany the ggplot summary figure
-pcaAll <- cbind(benthic, pca$ind$coord[,1:2]) %>%
-  mutate(disturbance = factor(disturbance, levels = c("historic", "hurricane", "disease")))
-
-pcaplot2 <- ggscatter(pcaAll, x = "Dim.1", y = "Dim.2", color = "disturbance", size = 4, alpha = 0.7, palette = "Dark2") +
-  labs(x = "PC1 (27.2%)", y = "PC2 (15.2%)") +
-  border()+
-  theme(legend.position = "none")
-
-cx <- ggplot(pcaAll, aes(x = disturbance, y = Dim.1, fill = disturbance)) +
-  geom_boxplot() +
-  scale_fill_brewer(palette = "Dark2") +
-  rotate() +
-  clean_theme()+
-  theme(legend.position = "none")
-
-dy <- ggplot(pcaAll, aes(x = disturbance, y = Dim.2, fill = disturbance)) +
-  geom_boxplot() +
-  scale_fill_brewer(palette = "Dark2") +
-  clean_theme() +
-  theme(legend.position = "none")
-
-## Create graphs of significant and not significant variables from ANOVA and Kruskal-Wallis tests
-benthic_vars <- c("HardCoral","Macroalgae","Ramicrusta","SoftCoral","TurfAlgae")
-
-benthic_sigvars <- c("Macroalgae","Ramicrusta","TurfAlgae")
-
-benthic_notsigvars <- c("HardCoral","SoftCoral")
-
-benthic.forFigures <- env.long.olrm %>%
-  filter(datatype %in% benthic_vars) %>%
-  drop_na(value) %>%
-  mutate(datatype = factor(datatype, levels = c("Ramicrusta","TurfAlgae","Macroalgae","HardCoral","SoftCoral")))
-
-sig <- benthic.forFigures %>%
-  filter(datatype %in% benthic_sigvars) %>%
-  mutate(datatype = factor(datatype, levels = c("Ramicrusta","TurfAlgae","Macroalgae")))
-
-notsig <- benthic.forFigures %>%
-  filter(datatype %in% benthic_notsigvars) %>%
-  mutate(datatype = factor(datatype, levels = c("HardCoral","SoftCoral")))
-
-# significantly changing by disturbance (p<0.05 and <bonf corrected p)
-bplot <- ggplot(sig, aes(x = disturbance, y = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance), size = 3, alpha = 0.7) +
-  labs(y = "Relative cover", x = "Disturbance event", color = "Disturbance") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap( ~ datatype, scales = "free_y", ncol = 2)
-
-# FIGURE 2
-
-# Arranging the plot
-fig2 <- ggarrange(ggarrange(cx, NULL, pcaplot2, dy, 
-          ncol = 2, nrow = 2,  align = "hv", 
-          widths = c(4,1), heights = c(1, 4)), 
-          bplot, labels = c("a.", "b."))
-annotate_figure(fig2, top = "Figure 2. Benthic composition at eight reefs significantly changed with disturbances")
-
-#Use vegan for the benthic pca stuff - PCAs are made with euclidian distance so use adonis function but make sure method = "eu"
-# Interested in how environmental variables influence benthic composition
-site <- adonis2(pca_data_short_final ~ site, data = benthic, method = "eu")
-site
-
-dist <- adonis2(pca_data_short_final ~ disturbance, data = benthic, method = "eu")
-dist
-
-date <- adonis2(pca_data_short_final ~ Date, data = benthic, method = "eu")
-date
-
-# not significantly changing benthic variables
-ggplot(notsig, aes(x = disturbance, y = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance), size = 3, alpha = 0.7) +
-  labs(y = "Relative cover", x = "Disturbance event", color = "Disturbance", title = "Supplementary Figure S2") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap( ~ datatype, scales = "free_y")
-
-# phase shift diagram
-phaseshift <- env.long.olrm %>%
-  filter(datatype %in% c("BenthicAlgae", "coral", "AlgaeToCoral")) %>%
-  spread(key = "datatype", value = "value")
-
-phase <- ggplot(phaseshift, aes(x = coral, y = BenthicAlgae, color = disturbance)) +
-  geom_point(size = 4, alpha = 0.8) +
-  scale_color_brewer(palette = "Dark2") +
-  labs(x = "Hard and soft coral cover", y = "Algal cover", color = "Disturbance", title = "Figure S3")
-
-ratio <- ggplot(phaseshift, aes(x = disturbance, y = AlgaeToCoral)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance), size = 3, alpha = 0.7) +
-  labs(y = "Ratio of algae to coral", x = "Disturbance event", color = "Disturbance", title = "Figure S3") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-  scale_color_brewer(palette = "Dark2") 
-
-ggarrange(phase, ratio, ncol = 2, labels = c("a.",  "b."), common.legend = TRUE) + 
-  ggtitle("Supplementary Figure S3")
-```
-
-By what percent did hard coral decrease from the hurricane period to the
-end of the study in the disease period? Average (within reefs) hurricane
-values and disease values and get a percent per reef before and after.
-
-Also get coral cover at the start and end of the study
-
-```{r}
-hardcoral <- benthic.forFigures %>%
-  filter(datatype == "HardCoral") %>%
-  filter(disturbance != "historic") %>%
-  group_by(disturbance, site) %>%
-  summarise(avg_HardCoral = mean(value)) %>%
-  tidyr::spread(key = disturbance, value = avg_HardCoral) %>%
-  mutate(coral_change = hurricane - disease) %>%
-  mutate(percent_decrease = (coral_change / hurricane)* 100)
-
-kable(hardcoral)
-
-# How much coral cover was there at the first and last time period?
-coralstart_end <- benthic.forFigures %>% 
-  tidyr::spread(key = datatype, value = value) %>%
-  mutate(totalcoral = (HardCoral + SoftCoral)*100) %>%
-  dplyr::select(site, yearmonth, totalcoral) %>%
-  filter(yearmonth %in% c("2016-06", "2022-06"))
-```
-
-By what percent did turf algae and Ramicrusta increase from the beginning
-to the end of the study in the disease period? Average (within reefs)
-historic or hurricne (for ramicrusta) values and disease values and get a
-percent per reef before and after.
-
-```{r}
-turfalgae <- benthic.forFigures %>%
-  filter(datatype == "TurfAlgae") %>%
-  filter(disturbance != "hurricane") %>%
-  group_by(disturbance, site) %>%
-  summarise(avg_TA = mean(value)) %>%
-  tidyr::spread(key = disturbance, value = avg_TA) %>%
-  mutate(TA_change = disease - historic) %>%
-  mutate(percent_increase = (TA_change / historic)* 100)
-
-kable(turfalgae)
-
-mean(turfalgae$percent_increase)
-sd(turfalgae$percent_increase)
-
-# Use the hurricane time period because we didn't always account for ramicrusta
-ramicrusta <- benthic.forFigures %>%
-  filter(datatype == "Ramicrusta") %>%
-  filter(disturbance != "historic") %>%
-  group_by(disturbance, site) %>%
-  summarise(avg_RC = mean(value)) %>%
-  tidyr::spread(key = disturbance, value = avg_RC) %>%
-  mutate(RC_change = disease - hurricane) %>%
-  mutate(percent_increase = (RC_change / hurricane)* 100)
-
-kable(ramicrusta)
-
-mean(ramicrusta$percent_increase)
-sd(ramicrusta$percent_increase)
-
-# How much algal cover was there at the first and last time period?
-algaestart_end <- benthic.forFigures %>% 
-  tidyr::spread(key = datatype, value = value) %>%
-  mutate(totalalgae = (Ramicrusta + Macroalgae + TurfAlgae)*100) %>%
-  dplyr::select(site, yearmonth, totalalgae) %>%
-  filter(yearmonth %in% c("2016-06", "2022-06"))
-```
-
-## 
-
-# Nutrient changes with disturbance
-
-```{r nutrient data for publication}
-nuts_vars <- c("po4_um","silicate_um","no2_um", "TON", "npoc_um","nh4_um","Chl_ug_per_l","no3_um")
-
-nuts_sigvars <- c("po4_um","silicate_um","TON","nh4_um","Chl_ug_per_l")
-
-nuts_notsigvars <- c("no2_um", "npoc_um", "no3_um")
-
-nuts.forFigures <- env.long.olrm %>%
-  filter(datatype %in% nuts_vars) %>%
-  drop_na(value) %>%
-  mutate(datatype = factor(datatype, levels = c("nh4_um","TON","Chl_ug_per_l","po4_um","silicate_um", "npoc_um","no2_um", "no3_um")))
-
-sig <- nuts.forFigures %>%
-  filter(datatype %in% nuts_sigvars) %>%
-  mutate(datatype = factor(datatype, levels = c("nh4_um","TON","Chl_ug_per_l","po4_um","silicate_um")))
-
-notsig <- nuts.forFigures %>%
-  filter(datatype %in% nuts_notsigvars) %>%
-  mutate(datatype = factor(datatype, levels = c("npoc_um","no2_um", "no3_um")))
-
-# significantly changing by disturbance (p<0.05 and <bonf corrected p)
-ggplot(sig, aes(x = disturbance, y = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance), size = 3, alpha = 0.7) +
-  labs(y = "Concentration", x = "Disturbance event", color = "Disturbance", title = "Figure 3.") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap( ~ datatype, scales = "free_y")
-
-#ggsave("../figures/Nutrients_significant.pdf")
-
-# not significantly changing
-ggplot(notsig, aes(x = disturbance, y = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance), size = 3, alpha = 0.7) +
-  labs(y = "Concentration", x = "Disturbance event", color = "Disturbance", title = "Supplementary Figure S4") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap( ~ datatype, scales = "free_y")
-
-#ggsave("../figures/Nutrients_NOT_sig.pdf")
-```
-
-## Cell abundance changes with disturbance
-
-```{r  publication figures for cell abundances}
-cells_vars <- c("pro_per_ml","syn_per_ml","peuk_per_ml","hbact_per_ml","biomassRatio")
-
-cells_sigvars <- c("pro_per_ml","peuk_per_ml","biomassRatio")
-
-cells_notsigvars <- c("syn_per_ml","hbact_per_ml")
-
-cells.forFigures <- env.long.olrm %>%
-  filter(datatype %in% cells_vars) %>%
-  drop_na(value) %>%
-  mutate(datatype = factor(datatype, levels = c("pro_per_ml","peuk_per_ml","syn_per_ml","hbact_per_ml","biomassRatio")))
-
-sig <- cells.forFigures %>%
-  filter(datatype %in% cells_sigvars) %>%
-  mutate(datatype = factor(datatype, levels = c("pro_per_ml","peuk_per_ml","biomassRatio")))
-
-notsig <- cells.forFigures %>%
-  filter(datatype %in% cells_notsigvars) %>%
-  mutate(datatype = factor(datatype, levels = c("syn_per_ml","hbact_per_ml")))
-
-# significantly changing by disturbance (p<0.05 and <bonf corrected p)
-ggplot(sig, aes(x = disturbance, y = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance), size = 3, alpha = 0.7) +
-  labs(y = "Abundance (cells per milliliter)", x = "Disturbance event", color = "Disturbance", title = "Figure 4") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap( ~ datatype, scales = "free_y")
-
-#ggsave("../figures/Cells_sig_disturbance.pdf")
-
-# not significantly changing
-ggplot(notsig, aes(x = disturbance, y = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(colour = disturbance), size = 3, alpha = 0.7) +
-  labs(y = "Abundance (cells per milliliter)", x = "Disturbance event", color = "Disturbance", title = "Figure S6") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-  scale_color_brewer(palette = "Dark2") +
-  facet_wrap( ~ datatype, scales = "free_y")
-
-#ggsave("../figures/Cells_NOT_sig_disturbance.pdf")
-
-```
-
-By what percent did prochlorococcus decrease between historic and disease
-time points? Average (within reefs) historic values and disease values
-and get a percent per reef before and after. This shows the cumulative
-change in prochlorococcus over the course ofthe study.
-
-```{r}
-pro_cumulative_change <- cells.forFigures %>%
-  filter(datatype == "pro_per_ml") %>%
-  filter(disturbance != "hurricane") %>%
-  group_by(disturbance, site) %>%
-  summarise(avg_Pro = mean(value)) %>%
-  tidyr::spread(key = disturbance, value = avg_Pro) %>%
-  mutate(Pro_change = historic - disease) %>%
-  mutate(percent_decrease = (Pro_change / historic)* 100)
-
-kable(pro_cumulative_change)
-
-mean(pro_cumulative_change$percent_decrease)
-sd(pro_cumulative_change$percent_decrease)
-```
-
-# Don't save the practice LMM code
-
-## REVISIONS Figures and Analyses for paper revision
-
-## Try accounting for sampling site and sampling timepoint in the disturbance analysis for environmental data.
-
-### First Hard Coral to test
-
-```{r}
-# Use the data from the ## ANOVA or Kruskal Wallis tests section
-env.data.foranalysis
-
-# make sure reef site and yearmonth are factors with levels
-env.data.foranalysis <- env.data.foranalysis %>%
-  mutate(yearmonth = factor(yearmonth, levels = c("2016-06", "2016-10", "2017-03", "2017-07", "2017-11", "2018-04", "2018-11", "2020-08", "2021-01", "2021-10", "2022-06")))
-
-# test on one variable first, before going through lots of them
-coral.data <- filter(env.data.foranalysis, datatype == "HardCoral")
-
-# use a linear mixed-effects model (LMM) to examine the impact of disturbance on hard coral on reefs. Use this model to account for any random effects due to site-based differences in coral cover and random effects associated with the sampling timepoint ("yearmonth"). 
-coral_model <- lme4::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = coral.data)
-
-# now lets look at the model
-summary(coral_model)
-
-# check model assumptions that residuals are normally distributed 4 ways. 
-  ## 1) plot residuals against predicted values
-  ## 2) rough normality check (qq plot)
-  ## 3) check variance constant across range of values by looking at the distribution of residuals
-  ## 4) spot outliers
-
-pred.coral <- predict(coral_model)
-res.coral <- residuals(coral_model)
-res.pred.model <- data.frame(pred.coral, res.coral, coral.data)
-
-plot(x = pred.coral, y = res.coral)
-abline(h = 0)
-
-qqnorm(res.coral) # surprisingly looks pretty good! 
-hist(res.coral)
-
-# compare residual variances across groups (fixed and random effect groups) to check homogeneity of variance
-ggplot(res.pred.model, aes(x = pred.coral, y = res.coral, color = disturbance)) +
-  geom_point() +
-  geom_hline(yintercept = 0)
-ggplot(res.pred.model, aes(x = pred.coral, y = res.coral, color = disturbance)) +
-  geom_point() +
-  geom_hline(yintercept = 0) +
-  facet_wrap(. ~ disturbance)
-ggplot(res.pred.model, aes(x = pred.coral, y = res.coral, color = site)) +
-  geom_point() +
-  geom_hline(yintercept = 0) +
-  facet_wrap(. ~ site)
-ggplot(res.pred.model, aes(x = pred.coral, y = res.coral, color = yearmonth)) +
-  geom_point() +
-  geom_hline(yintercept = 0) +
-  facet_wrap(. ~ yearmonth)
-# Overall, my takeaway is that this model meets assumptions. The residuals overall are normally distributed. Additionally, the variance of the residuals is pretty consistent visually across the different fixed and random effects groups
-
-# Does adding in timpoint as a random effect to control for any variance due to timepoint make a stronger model? Compare two models, one without timepoint random effect
-
-coral_model_notime <- lme4::lmer(value ~ disturbance + (1|site), data = coral.data)
-summary(coral_model_notime)
-
-# I now have two models. One incorporates timepoint as a random effect, and one that only includes site as a random effect. Both investigate the change due to disturbance. 
-# I can use a likelihood ratio test with the anova function to examine which model is better
-anova(coral_model, coral_model_notime)
-
-# I can see that in the coral_model, where we added 1 parameter (random effect of yearmonth), there was a very small p value, which means the fit is SO much better than with only accounting for a random effect of site. This leads me to believe that doing a test in which i incorporate random effect of site AND timepoint, will lead to better fit of the model. I will keep including timepoint as a random effect.
-
-# What about including site or not?
-coral_model_nosite <- lme4::lmer(value ~ disturbance + (1|yearmonth), data = coral.data)
-summary(coral_model_nosite)
-
-anova(coral_model, coral_model_nosite)
-# I can see that the model in which I add site as a random effect leads to an improvement of the fit of the model over only including a random effect for yearmonth. This is based on the small p-value associated with the chisq statistic. 
-# I conclude that I will include both site and yearmonth as fixed effects in the model. 
-
-
-## I now have a model I like (coral_model) and the model assumptions are adequately met. 
-
-## Next step - compute confidence intervals (better than just standard error bars) and a p value (realistically, my reviewers will want this). Putting 95% confidence intervals on the graphs will be better and show the differences. 
-
-confint.merMod(coral_model)
-
-# Plot the predictions for coral cover across different disturbances
-ggplot(res.pred.model, aes(x = disturbance, y = pred.coral, color = site)) +
-  geom_point()
-# plot the actual - look how much variance we removed by doing the model!
-ggplot(res.pred.model, aes(x = disturbance, y = value, color = site)) +
-  geom_point()
-
-# Get p-values for the graphs
-#install.packages("afex")
-library(afex); packageVersion("afex")
-
-coral_model_p <- mixed(value ~ disturbance + (1|site) + (1|yearmonth), data = coral.data, method = "KR", check_contrasts = TRUE)
-coral_model_p
-summary(coral_model_p)
-
-confint(coral_model)
-
-#install.packages("ciTools")
-library(ciTools)
-
-summary(coral_model)
-add_ci(coral.data, coral_model, alpha = 0.05, type = "parametric")
-
-
-coral_null <- lme4::lmer(value ~ 1 + (1|site) + (1|yearmonth), data = coral.data)
-coral_null
-
-# Use likelihood ratio test to compare the null to the actual model
-anova(coral_null, coral_model)
-
-# When I compare whether disturbance had a significant impact on coral cover, I find that disturbance did not impact coral cover (X^2(1)=3.55, p=0.1697), and if it were signficant I could state how much it increased or decreased. 
-
-
-```
-
-### Next ammonium to test
-
-```{r}
-# Use the data from the ## ANOVA or Kruskal Wallis tests section
-env.data.foranalysis
-
-# test on one variable first, before going through lots of them
-nh4.data <- filter(env.data.foranalysis, datatype == "nh4_um")
-
-# use a linear mixed-effects model (LMM) to examine the impact of disturbance on ammonium on reefs. Use this model to account for any random effects due to site-based differences in coral cover and random effects associated with the sampling timepoint ("yearmonth"). 
-nh4_model <- lmerTest::lmer(value ~ disturbance + (1|site) + (1|yearmonth), data = nh4.data)
-
-# now lets look at the model
-summary(nh4_model)
-
-# check model assumptions that residuals are normally distributed 4 ways. 
-  ## 1) plot residuals against predicted values
-  ## 2) rough normality check (qq plot)
-  ## 3) check variance constant across range of values by looking at the distribution of residuals
-  ## 4) spot outliers
-
-pred.nh4 <- predict(nh4_model)
-res.nh4 <- residuals(nh4_model)
-res.pred.model.nh4 <- data.frame(pred.nh4, res.nh4, nh4.data)
-
-variable <- "ammonium"
-
-par(mfrow=c(2,2))
-plot(x = pred.nh4, y = res.nh4)
-abline(h = 0)
-qqnorm(res.nh4) 
-hist(res.nh4)
-plot.new()
-text(0.5,0.5, paste(variable), cex=2)
-
-# compare residual variances across groups (fixed and random effect groups) to check homogeneity of variance
-ggplot(res.pred.model.nh4, aes(x = pred.nh4, y = res.nh4, color = disturbance)) +
-  geom_point() +
-  geom_hline(yintercept = 0) +
-  ggtitle(paste(variable))
-ggplot(res.pred.model.nh4, aes(x = pred.nh4, y = res.nh4, color = disturbance)) +
-  geom_point() +
-  geom_hline(yintercept = 0) +
-  facet_wrap(. ~ disturbance) +
-  ggtitle(paste(variable))
-ggplot(res.pred.model.nh4, aes(x = pred.nh4, y = res.nh4, color = site)) +
-  geom_point() +
-  geom_hline(yintercept = 0) +
-  facet_wrap(. ~ site)+
-  ggtitle(paste(variable))
-ggplot(res.pred.model.nh4, aes(x = pred.nh4, y = res.nh4, color = yearmonth)) +
-  geom_point() +
-  geom_hline(yintercept = 0) +
-  facet_wrap(. ~ yearmonth)+
-  ggtitle(paste(variable))
-# Overall, my takeaway is that this model meets assumptions. 
-
-# Does adding in timepoint and site as a random effect to control for any variance due to timepoint make a stronger model? Use the likelihood ratio test to compare the models with and without those random effects. 
-
-# make models with only one random effect
-nh4_model_notime <- lmerTest::lmer(value ~ disturbance + (1|site), data = nh4.data)
-nh4_model_nosite <- lmerTest::lmer(value ~ disturbance + (1|yearmonth), data = nh4.data)
-
-# Use the likelihood ratio test to compare the models to the full model. If the full model is an imporvement, use it. 
-timeeval <- anova(nh4_model, nh4_model_notime)
-timeeval_p <- timeeval$`Pr(>Chisq)`[2]
-siteeval <- anova(nh4_model, nh4_model_nosite)
-siteeval_p <- siteeval$`Pr(>Chisq)`[2]
-
-# Looks like adding site is irrelevant but timepoint (yearmonth) is important for a better fit of the model.
-
-## I now have a model I am ok with (nh4_model) and the model assumptions are adequately met. 
-
-## Next step - answer the question, does disturbance itself signficantly impact ammonium on reefs. Use a likelihood ratio test comparing two models. One in which disturbance is used as a covariate to explain changes in ammonium, and one where it is not included. 
-nh4_null <- lmerTest::lmer(value ~ 1 + (1|site) + (1|yearmonth), data = nh4.data)
-
-# Use likelihood ratio test to compare the null to the actual model
-disturbance_result <- anova(nh4_null, nh4_model)
-disturbance_result_report <- disturbance_result[2,6:8]
-
-# When I compare whether disturbance had a significant impact on ammonium, I find that disturbance DID impact ammonium (X^2(1)=7.1882, p=0.02749), increasing ammonium by 0.145 uM during the post-hurricane period and increasing 0.203 uM during the disease outbreak.
-
-# Next just have in the background the comparison of predicted vs. actual values as plots
-# Plot the predictions for coral cover across different disturbances
-predicted <- ggplot(res.pred.model.nh4, aes(x = disturbance, y = pred.nh4)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = disturbance), size = 3, alpha = 0.7) +
-  scale_color_brewer(palette = "Dark2") 
-# plot the actual - look how much variance we removed by doing the model!
-actual <- ggplot(res.pred.model.nh4, aes(x = disturbance, y = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(position = position_jitter(width=.1, height=0), aes(color = disturbance), size = 3, alpha = 0.7) +
-  scale_color_brewer(palette = "Dark2") 
-
-ggarrange(predicted, actual, ncol = 2, labels = c(paste("Predicted", variable), paste("Actual", variable)), common.legend = TRUE, widths = c(1,1))
-
-## Next step - compute confidence intervals (better than just standard error bars) and a p value (realistically, my reviewers will want this). Putting 95% confidence intervals on the graphs will be better and show the differences. Ignore the (intercept) part because that is the baseline, and refers to the historic grouping. In the fixed effects of the summary output, the estimates represent how much HIGHER (or lower) the value is compared to the intercept.
-
-# PLot the estimates and their confidence intervals. If they don't pass through zero, that is usually a good indicator that they significantly changed. 
-fe <- fixef(nh4_model)
-ci <- confint(nh4_model)
-
-cife <- data.frame(ci[4:6,], fe, "disturbance" = c("historic", "hurricane", "disease"))
-colnames(cife) <- c("lower", "upper", "fixedeff", "disturbance")
-cife$disturbance <- factor(cife$disturbance, levels = c("historic", "hurricane", "disease"))
-
-cife_noIntercept <- cife[2:3,]
-
-# Plot the coefficients for ammonium across different disturbances with the confidence intervals. Since they don't go through zero that is a good indicator that it will be significant. But I will double check this. 
-ggplot(cife_noIntercept, aes(x = disturbance, y = fixedeff, color = disturbance)) +
-  geom_hline(yintercept = 0, color = "#1B9E77", size = 1) +
-  geom_point(size = 5) +
-  geom_errorbar(data = cife_noIntercept, aes(ymin = lower, ymax = upper), width = 0.2, size = 1.5) +
-  scale_color_manual(values = c("#D95F02", "#7570B3")) +
-  labs(x = "Disturbance", y = "Estimate with 95% CI relative to Historic", title = paste(variable))
-```
-
-# 
-
-# Differential Abundance
-
-### Load data
-
-```{r}
-# Prep the phyloseq object
-sample_data(ps)$date <- as.Date(sample_data(ps)$date)
-sample_data(ps)$site <- factor(sample_data(ps)$site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head", "Sand patch"))
-sample_data(ps)$disturbance <- factor(sample_data(ps)$disturbance, levels = c("historic", "hurricane", "disease"))
-
-# BENTHIC DATA
-ps.benthic <- ps %>% 
-  subset_samples(site != "Sand patch") %>%
-  subset_samples(depth == "Benthic")
-
-# test differential abundance between all 3 timepoints, then just between hurricane and disease
-ps.benthic.disturbances <- ps.benthic %>% 
-  subset_samples(disturbance %in% c("hurricane", "disease"))
-
-# Try renaming all the NA taxa using the fantaxtic package Natasha sent me
-ps.benthic.disturbances <- name_na_taxa(ps.benthic.disturbances, 
-                                        na_label = "Unclassified <tax> (<rank>)")
-ps.benthic <- name_na_taxa(ps.benthic, 
-                           na_label = "Unclassified <tax> (<rank>)")
-```
-
-### Benthic community
-
-```{r disturbance benthic, message=FALSE}
-# What microorganisms are significantly changing across disturbances? Reef and timpoint are important covariates too, so control for the effect of reef site and month year timepoint abundance and dispersion
-# Note historic is the control so plots will show hurricane and diseae relative to that timepoint
-set.seed(1)
-disturbance.da <- differentialTest(formula = ~ disturbance + site, 
-                             phi.formula = ~ disturbance + site,
-                             formula_null = ~ site,
-                             phi.formula_null = ~ disturbance + site,
-                             test = "Wald", boot = FALSE,
-                             data = ps.benthic,
-                             fdr_cutoff = 0.05)
-
-# What microorganisms are significantly changing between hurricane and disease disturbances? Reef and timpoint are important covariates too, so control for the effect of reef site and month year timepoint abundance and dispersion
-# Note historic is the control so plots will show hurricane and diseae relative to that timepoint
-set.seed(1)
-hurr.sctld.da <- differentialTest(formula = ~ disturbance + site, 
-                             phi.formula = ~ disturbance + site,
-                             formula_null = ~ site,
-                             phi.formula_null = ~ disturbance + site,
-                             test = "Wald", boot = FALSE,
-                             data = ps.benthic.disturbances,
-                             fdr_cutoff = 0.05)
-
-
-# save the disturbance.da output and add asv, p.adj values to it, and ultimately taxonomny info
-dist.da.models <- lapply(disturbance.da$significant_models, extractmods1)
-names(dist.da.models) <- disturbance.da$significant_taxa
-
-# Add ASVs to the taxonomy table and save the significant asvs
-tax_table(ps.benthic)[,7] <- rownames(tax_table(ps.benthic))
-sig.taxonomy <- as.data.frame(tax_table(ps.benthic)[disturbance.da$significant_taxa,]) 
-
-# Move the data from a list to a dataframe and add taxonomy info
-dist.da.models.df <- ldply(dist.da.models, data.frame) %>% 
-  mutate(test = rep(c("disturbancehurricane", "disturbancedisease"), times = 354/2)) %>% 
-  left_join(sig.taxonomy, by = c(".id" = "Species")) %>%
-  mutate(genusasv = paste0(Genus, "_(", .id,")"))
-
-## hurr.sctld.da output ##
-
-# save the disturbance.da output and add asv, p.adj values to it, and ultimately taxonomny info
-hurr.sctld.da.models <- lapply(hurr.sctld.da$significant_models, extractmods2)
-names(hurr.sctld.da.models) <- hurr.sctld.da$significant_taxa
-
-# Add ASVs to the taxonomy table and save the significant asvs
-tax_table(ps.benthic.disturbances)[,7] <- rownames(tax_table(ps.benthic.disturbances))
-sig.taxonomy2 <- as.data.frame(tax_table(ps.benthic.disturbances)[hurr.sctld.da$significant_taxa,]) 
-
-# Move the data from a list to a dataframe and add taxonomy info
-hurr.sctld.da.models.df <- ldply(hurr.sctld.da.models, data.frame) %>%
-  mutate(test = rep("hurricanedisease")) %>% 
-  left_join(sig.taxonomy2, by = c(".id" = "Species")) %>%
-  mutate(genusasv = paste0(Genus, "_(", .id,")"))
-
-# Add the data together, sort by ASV, then save
-allresults <- rbind(dist.da.models.df, hurr.sctld.da.models.df) %>%
-  arrange(.id, test) %>%
-  mutate(coefNOTzero = Estimate + Std.Error >= 0 & Estimate - Std.Error >= 0 | Estimate + Std.Error <= 0 & Estimate - Std.Error <= 0) %>%
-  mutate(coefABOVEtwo = abs(Estimate) > 2) %>%
-  mutate(coefABOVEone = abs(Estimate) > 1)
-
-### Save these data so you don't have to re-run the model ###
-# write.table(allresults, "data/Sig_ASVs_Disturbance_Feb23.txt", sep="\t",row.names = FALSE)
-```
-
-So I saved the output of all the ASVs that were differentially enriched
-or depleted between the following conditions: historic disturbance and
-hurricane (historic is baseline) historic disturbacne and disease
-(historic is baseline) hurricane and disease (hurricane is baseline)
-
-### What are the taxonomic assignments of differentially abundant taxa?
-
-```{r Corncob_results, message=FALSE, warning=FALSE}
-DAdisturbance <- read_delim("data/Sig_ASVs_Disturbance_Feb23.txt", delim = "\t", col_names = TRUE)
-
-# remove all FALSE asvs - these are ones where the coeficient passes through zero with the standard error and I'd rather not graph those
-DA_nozero <- DAdisturbance %>%
-  filter(coefNOTzero == TRUE)
-
-# how many differentially abundant ASVs - ~200!
-DA_nozero$.id %>% unique %>% length
-
-
-DAresults <- DA_nozero %>% 
-  dplyr::select(.id, Estimate, test, Kingdom, Class, Order, Family, genusasv) %>%
-  arrange(desc(Class), Estimate)
-
-kable(DAresults)
-```
-
-# Random Forest Analysis
-
-```{r}
-# adjust levels for random forest analysis
-sample_data(ps)$disturbance <- factor(sample_data(ps)$disturbance, levels = c("historic", "hurricane", "disease"))
-
-# Try renaming all the NA taxa using the fantaxtic package Natasha sent me
-ps.RF <- name_na_taxa(ps, na_label = "Unclassified <tax> (<rank>)")
-
-# BENTHIC FILTERED data (~1000 taxa)
-ps.benthicfilt <- ps.RF %>% 
-  subset_samples(site != "Sand patch") %>%
-  subset_samples(depth == "Benthic") %>%
-  filter_taxa(function(x) mean(x) > 0.5, TRUE) # keep if avg abundance 0.5 counts
-
-taxa <- ps.benthicfilt %>% tax_table() %>% rownames
-
-# Get surface taxa based on the asvs in the benthic seawater - This will be for validation of the random forest model
-ps.surfacefilt <- ps %>% 
-  subset_samples(site != "Sand patch") %>%
-  subset_samples(depth == "Surface") %>%
-  mutate_tax_table(ASV = .otu) %>% 
-  subset_taxa(ASV %in% taxa)
-```
-
-## Generate and test random forest model
-
-```{r RF model}
-## RANDOM FOREST ANALYSIS ##
-# get the ASVs as columns and samples as rows, which are the predictors
-predictors <- t(otu_table(ps.benthicfilt))
-
-# response variable is the disturbance groups
-response <- as.factor(sample_data(ps.benthicfilt)$disturbance)
-
-# combine with the ASV table
-resp.pred <- data.frame(response, predictors)
-
-# set seed for reproducibility and this is the main random forest model
-set.seed(10)
-disturbance.classify <- randomForest(response ~ ., data = resp.pred, ntree = 1000, importance = TRUE)
-print(disturbance.classify)
-
-# Validate the model on surface data
-validation <- t(otu_table(ps.surfacefilt))
-
-response <- as.factor(sample_data(ps.surfacefilt)$disturbance)
-
-valid.resp <- data.frame(response, validation)
-
-# Validation set assessment #1: looking at confusion matrix
-prediction_for_table <- predict(disturbance.classify, valid.resp[,-1])
-
-table(observed = valid.resp[,1], predicted = prediction_for_table)
-```
-
-## Save Random Forest data output
-
-```{r}
-# make a data frame with predictor names and the importance value
-imp <- importance(disturbance.classify)
-imp <- data.frame(predictors = rownames(imp), imp)
-
-# order the predictor levels by importance (higher number is more important)
-imp.sort.Accuracy <- arrange(imp, desc(MeanDecreaseAccuracy))
-
-# Select the top 50 important taxa based on the Mean Decrease Accurracy metric
-imp.50.acc <- imp.sort.Accuracy[1:50,]
-
-# Save a table of the top 50 ASVs
-ASV.50.acc <- imp.50.acc$predictors
-r <- rownames(tax_table(ps.benthicfilt)) %in% ASV.50.acc
-table <- tax_table(ps.benthicfilt)[r,]
-
-table <- as.data.frame(table)
-table$ASV <- rownames(table)
-
-tableAccuracy <- left_join(table, imp.50.acc, by = c("ASV" = "predictors"))
-
-# write.table(tableAccuracy, "data/RandomForest_disturbance_top50_accuracy_benthic.txt", sep = "\t", row.names = FALSE)
-
-kable(table)
-```
-
-# Figure 6
-
-```{r message=FALSE}
-DAtaxa <- read_delim("data/Sig_ASVs_Disturbance_Feb23.txt", delim = "\t", col_names = TRUE)
-
-RFtaxa <- read_delim("data/RandomForest_disturbance_top50_accuracy_benthic.txt", delim = "\t", col_names = TRUE)
-
-# adjust levels on the phyloseq object
-sample_data(ps)$site <- factor(sample_data(ps)$site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head", "Sand patch"))
-sample_data(ps)$disturbance <- factor(sample_data(ps)$disturbance, levels = c("historic", "hurricane", "disease"))
-
-# Try renaming all the NA taxa using the fantaxtic package Natasha sent me
-ps.fig6 <- name_na_taxa(ps, na_label = "Unclassified <tax> (<rank>)")
-
-ps.benthic <- ps.fig6 %>% 
-  subset_samples(site != "Sand patch") %>%      # remove sand patch samples
-  subset_samples(depth == "Benthic") %>%        # only focus on benthic samples
-  mutate_tax_table(ASV = .otu)                  # add ASV/otu column
-```
-
-How many ASVs are shared?
-
-```{r}
-RFasvs <- RFtaxa %>% 
-  dplyr::select(ASV, MeanDecreaseAccuracy)
-
-shared <- DAtaxa %>%
-  left_join(RFasvs, by = c(".id" = "ASV")) %>%
-  drop_na(MeanDecreaseAccuracy) %>% 
-  filter(coefNOTzero == "TRUE") # remove taxa that cross zero in differential abundnatce test
-
-# how many ASVs?
-shared$.id %>% unique %>% length
-```
-
-Make a table of shared taxa
-
-```{r}
-importantASVs <- shared$.id %>% unique
-
-r <- rownames(tax_table(ps.benthic)) %in% importantASVs
-
-sharedtaxa <- as.data.frame(tax_table(ps.benthic)[r,])
-```
-
-Make the shared graph
-
-```{r}
-# corncob results
-# order the taxa how i want them in the plot, with the archaea at the bottom
-genusASVorder <- shared %>%
-  arrange(Kingdom, desc(Class), Estimate) %>%
-  dplyr::select(genusasv) %>%
-  unique() 
-
-shared$genusasv <- factor(shared$genusasv, levels = as.vector(genusASVorder$genusasv))
-shared$test <- factor(shared$test, levels = c("disturbancehurricane", "disturbancedisease", "hurricanedisease"))
-shared$Class <- factor(shared$Class, levels = c("Alphaproteobacteria", "Bacteroidia", "Bdellovibrionia",
-                                                "Cyanobacteriia", "Dehalococcoidia", 
-                                                "Gammaproteobacteria", 
-                                                "Unclassified Marinimicrobia (SAR406 clade) (Phylum)",
-                                                "Unclassified SAR324 clade(Marine group B) (Phylum)",
-                                                "Verrucomicrobiae", 
-                                                "Thermoplasmata"))
-
-
-palcolors <- c("#CC7A88", "#99600F", "#CCAA7A", "#54990F", "#3D0F99", "#967ACC","#0F8299",  "#7ABECC", "#333333", "#999999")
-
-a <- ggplot(shared, aes(x = genusasv, y = Estimate, color = Class)) +
-  geom_errorbar(aes(ymin = Estimate-Std.Error, ymax = Estimate+Std.Error), color = "black", width = .3, position=position_dodge(.9)) +
-  geom_point(size = 4) +
-  coord_flip() +
-  theme_bw() +
-  labs(x = "Taxa", y = "Coefficient from differential abundance test") +
-  facet_wrap(~ test) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "darkgray") +
-  theme(plot.background = element_blank(), 
-        legend.position = "bottom") +
-  scale_color_manual(values = palcolors)
-
-b <- ggplot(shared, aes(x = genusasv, y = MeanDecreaseAccuracy, fill = Class)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +
-  scale_fill_manual(values = palcolors) +
-  theme(plot.background = element_blank()) +
-  labs(x = "Taxa", y = "Mean decrease accuracy") +
-  theme(axis.title.y = element_blank(),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank(),
-        legend.position = "none")
-
-wrap_plots(a, b, widths = c(3,1))
-
-#ggsave("figures/DA_RFaccuracy_shared_3.15.23.pdf", width = 11, height = 7)
-```
-
-# 
