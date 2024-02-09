@@ -271,6 +271,22 @@ summary(Algaetrend)
 Algaetrend$coefficients[2]*31556926 # get the estimate in years (need to multiply the # of seconds in a year, 31556926)
 ```
 
+# Supplementary Figure S1 - SCTLD 
+
+```{r}
+sctld <- envdata %>%
+  select(Date:month, SCTLDprevalence) %>%
+  filter(!is.na(SCTLDprevalence)) %>%
+  mutate(site = factor(site, levels = c("Dittlif", "Cocoloba", "Joels Shoal", "Europa", "Yawzi", "Tektite", "Booby Rock", "Ram Head")))
+
+ggplot(sctld, aes(x = site, y = SCTLDprevalence*100, fill = yearmonth)) + 
+  geom_bar(position="dodge", stat="identity") +
+  scale_fill_manual(values = c("black", "gray55")) +
+  labs(x = "Reef", y = "Percent of corals with SCTLD", fill = "Year-month", title = "Figure S1. SCTLD Prevalence") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+
 # Figures 2 & 3 - Environmental Data analysis
 
 ## Prepare benthic and environmental data for analysis
