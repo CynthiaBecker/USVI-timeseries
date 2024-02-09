@@ -1,0 +1,51 @@
+"Kingdom"	"Phylum"	"Class"	"Order"	"Family"	"Genus"	"Species"	"ASV"	"X.IncMSE"	"IncNodePurity"
+"Bacteria"	"Cyanobacteria"	"Cyanobacteriia"	"Synechococcales"	"Cyanobiaceae"	"Prochlorococcus MIT9313"	"ASV2"	"ASV2"	7.90034909495838	0.117464523536052
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"SAR11 clade"	"Clade I"	"Clade Ia"	"ASV4"	"ASV4"	5.32663370875151	0.0536668940482661
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"SAR11 clade"	"Clade I"	"Clade Ia"	"ASV5"	"ASV5"	5.107158895963	0.0335020197749812
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Flavobacteriaceae"	"NS4 marine group"	"ASV14"	"ASV14"	17.4695019718527	0.524771012289674
+"Bacteria"	"Cyanobacteria"	"Cyanobacteriia"	"Synechococcales"	"Cyanobiaceae"	"Prochlorococcus MIT9313"	"ASV15"	"ASV15"	12.7592604533761	0.297405802603914
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"Rhodobacterales"	"Rhodobacteraceae"	"Unclassified Rhodobacteraceae (Family)"	"ASV16"	"ASV16"	9.49023881967377	0.222159797030659
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"SAR86 clade"	"Unclassified SAR86 clade (Family)"	"ASV22"	"ASV22"	5.24566735430599	0.0549794460215508
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"SAR11 clade"	"Clade II"	"Unclassified Clade II (Family)"	"ASV25"	"ASV25"	4.26841657979144	0.0185090776678688
+"Bacteria"	"Marinimicrobia (SAR406 clade)"	"Unclassified Marinimicrobia (SAR406 clade) (Phylum)"	"Unclassified Marinimicrobia (SAR406 clade) (Phylum)"	"Unclassified Marinimicrobia (SAR406 clade) (Phylum)"	"Unclassified Marinimicrobia (SAR406 clade) (Phylum)"	"ASV27"	"ASV27"	4.45261245686355	0.0157759219479185
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"SAR11 clade"	"Clade I"	"Clade Ib"	"ASV35"	"ASV35"	6.30388262338678	0.0298883806667693
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"SAR86 clade"	"Unclassified SAR86 clade (Family)"	"ASV40"	"ASV40"	4.70497657744962	0.0309540595566609
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"SAR86 clade"	"Unclassified SAR86 clade (Family)"	"ASV42"	"ASV42"	4.13848370043633	0.00971893091926469
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"NS9 marine group"	"Unclassified NS9 marine group (Family)"	"ASV47"	"ASV47"	4.35060665319538	0.0122810590608
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Flavobacteriaceae"	"NS4 marine group"	"ASV58"	"ASV58"	6.13681743135943	0.0289545812713693
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Flavobacteriaceae"	"NS5 marine group"	"ASV59"	"ASV59"	6.01280163336031	0.0687310323856405
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"SAR86 clade"	"Unclassified SAR86 clade (Family)"	"ASV61"	"ASV61"	8.71838684165647	0.067240747962401
+"Bacteria"	"SAR324 clade(Marine group B)"	"Unclassified SAR324 clade(Marine group B) (Phylum)"	"Unclassified SAR324 clade(Marine group B) (Phylum)"	"Unclassified SAR324 clade(Marine group B) (Phylum)"	"Unclassified SAR324 clade(Marine group B) (Phylum)"	"ASV68"	"ASV68"	6.77064977117948	0.0404781661373426
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"Litoricolaceae"	"Litoricola"	"ASV69"	"ASV69"	5.05796911293454	0.0273833644045372
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"Rickettsiales"	"S25-593"	"Unclassified S25-593 (Family)"	"ASV83"	"ASV83"	3.92294545732367	0.0108326992671786
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"Nitrincolaceae"	"Marinobacterium"	"ASV86"	"ASV86"	4.91407278629663	0.0156555234980656
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"SAR86 clade"	"Unclassified SAR86 clade (Family)"	"ASV96"	"ASV96"	4.37004719178971	0.0218972601068034
+"Archaea"	"Thermoplasmatota"	"Thermoplasmata"	"Marine Group III"	"Unclassified Marine Group III (Order)"	"Unclassified Marine Group III (Order)"	"ASV99"	"ASV99"	5.03914014551174	0.0189143733871989
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Flavobacteriaceae"	"NS4 marine group"	"ASV102"	"ASV102"	4.89736627207907	0.0186391501711145
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"Puniceispirillales"	"SAR116 clade"	"Unclassified SAR116 clade (Family)"	"ASV105"	"ASV105"	5.85452526617989	0.0172387156082817
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"SAR86 clade"	"Unclassified SAR86 clade (Family)"	"ASV125"	"ASV125"	6.99068613126052	0.0442638769041391
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"Porticoccaceae"	"SAR92 clade"	"ASV126"	"ASV126"	4.19292232786553	0.0327355310694953
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"SAR11 clade"	"Clade III"	"Unclassified Clade III (Family)"	"ASV133"	"ASV133"	8.67119304795944	0.0714960789980412
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"OM182 clade"	"Unclassified OM182 clade (Family)"	"ASV141"	"ASV141"	6.83073069477637	0.0491155447220542
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Cryomorphaceae"	"Unclassified Cryomorphaceae (Family)"	"ASV142"	"ASV142"	6.65388389463875	0.0329065522990984
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"Spongiibacteraceae"	"BD1-7 clade"	"ASV156"	"ASV156"	11.7111408032169	0.227707419433772
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"Thalassobaculales"	"Nisaeaceae"	"OM75 clade"	"ASV157"	"ASV157"	4.06282685126085	0.0162034851551001
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Flavobacteriaceae"	"Formosa"	"ASV158"	"ASV158"	4.57186569641105	0.0242434987056244
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Pseudomonadales"	"SAR86 clade"	"Unclassified SAR86 clade (Family)"	"ASV168"	"ASV168"	12.1760364306986	0.130999504662488
+"Archaea"	"Thermoplasmatota"	"Thermoplasmata"	"Marine Group II"	"Unclassified Marine Group II (Order)"	"Unclassified Marine Group II (Order)"	"ASV177"	"ASV177"	4.13051223754726	0.015497580260281
+"Bacteria"	"Dadabacteria"	"Dadabacteriia"	"Dadabacteriales"	"Unclassified Dadabacteriales (Order)"	"Unclassified Dadabacteriales (Order)"	"ASV202"	"ASV202"	4.42893856792156	0.0121562412161222
+"Bacteria"	"Bdellovibrionota"	"Bdellovibrionia"	"Bdellovibrionales"	"Bdellovibrionaceae"	"OM27 clade"	"ASV207"	"ASV207"	4.82863902022796	0.0342196686907418
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"SAR11 clade"	"Clade II"	"Unclassified Clade II (Family)"	"ASV218"	"ASV218"	5.2819936699605	0.0419406680488724
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Flavobacteriaceae"	"NS4 marine group"	"ASV227"	"ASV227"	4.94173678384379	0.0164848444586066
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"Rhodobacterales"	"Rhodobacteraceae"	"Unclassified Rhodobacteraceae (Family)"	"ASV236"	"ASV236"	4.02028776072205	0.00656889775586947
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Enterobacterales"	"Alteromonadaceae"	"Unclassified Alteromonadaceae (Family)"	"ASV242"	"ASV242"	6.718906847825	0.0418082043938555
+"Bacteria"	"Bdellovibrionota"	"Bdellovibrionia"	"Bdellovibrionales"	"Bdellovibrionaceae"	"OM27 clade"	"ASV250"	"ASV250"	6.12694384532333	0.0503490932440954
+"Archaea"	"Thermoplasmatota"	"Thermoplasmata"	"Marine Group II"	"Unclassified Marine Group II (Order)"	"Unclassified Marine Group II (Order)"	"ASV261"	"ASV261"	4.21465499939402	0.0169666063855241
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Flavobacteriaceae"	"Tenacibaculum"	"ASV268"	"ASV268"	5.42747014948862	0.0683487866419434
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Flavobacteriaceae"	"NS5 marine group"	"ASV273"	"ASV273"	8.9737186049725	0.0813426561908871
+"Bacteria"	"Verrucomicrobiota"	"Verrucomicrobiae"	"Opitutales"	"Puniceicoccaceae"	"MB11C04 marine group"	"ASV293"	"ASV293"	5.96267676691556	0.0380276427524618
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"SAR11 clade"	"Clade II"	"Unclassified Clade II (Family)"	"ASV307"	"ASV307"	15.0244103838134	0.190856810084018
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"NS9 marine group"	"Unclassified NS9 marine group (Family)"	"ASV357"	"ASV357"	4.43573605149395	0.00599057768708695
+"Bacteria"	"Bacteroidota"	"Bacteroidia"	"Flavobacteriales"	"Flavobacteriaceae"	"NS5 marine group"	"ASV404"	"ASV404"	6.54694469863404	0.040597275587866
+"Bacteria"	"Proteobacteria"	"Gammaproteobacteria"	"Piscirickettsiales"	"Piscirickettsiaceae"	"Candidatus Endoecteinascidia"	"ASV540"	"ASV540"	4.69949229422706	0.0301921239340719
+"Bacteria"	"Proteobacteria"	"Alphaproteobacteria"	"Rhodobacterales"	"Rhodobacteraceae"	"Thalassobius"	"ASV584"	"ASV584"	4.90421440453143	0.0480265520708095
